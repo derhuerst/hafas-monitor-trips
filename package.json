@@ -23,9 +23,17 @@
 	"engines": {
 		"node": ">=8"
 	},
-	"dependencies": {},
-	"devDependencies": {
+	"dependencies": {
+		"@turf/distance": "^6.0.1",
+		"@turf/square-grid": "^6.0.2",
+		"live-moving-average": "^0.1.1",
+		"lodash.throttle": "^4.1.1",
+		"p-queue": "^5.0.0"
 	},
+	"peerDependencies": {
+		"hafas-client": "^4"
+	},
+	"devDependencies": {},
 	"scripts": {
 		"test": "env NODE_ENV=dev node test.js",
 		"prepublishOnly": "npm test"
