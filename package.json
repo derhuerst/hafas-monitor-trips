@@ -24,7 +24,8 @@
 		"node": ">=8"
 	},
 	"dependencies": {
-		"@turf/distance": "^6.0.1",
+		"@turf/boolean-within": "^6.0.1",
+		"@turf/helpers": "^6.1.4",
 		"@turf/square-grid": "^6.0.2",
 		"live-moving-average": "^0.1.1",
 		"lodash.throttle": "^4.1.1",

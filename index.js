@@ -1,11 +1,13 @@
 'use strict'
 
+const {polygon, point} = require('@turf/helpers')
 const squareGrid = require('@turf/square-grid').default
-const distance = require('@turf/distance').default
+const debug = require('debug')('hafas-monitor-trips')
 const createAvgWindow = require('live-moving-average')
 const PQueue = require('p-queue')
 const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
+const isWithin = require('@turf/boolean-within').default
 
 const MINUTE = 60 * 1000
 const MAX_TILE_SIZE = 5000 // 5km
@@ -37,8 +39,7 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 	if (bbox.east <= bbox.west) throw new Error('bbox.east must be larger than bbox.west.')
 	const tiles = computeTiles(bbox)
 
-	const discoverInterval = Math.max(interval, Math.min(5 * interval, 3 * MINUTE))
-	const trackInterval = interval
+	const discoverInterval = Math.min(interval, 3 * MINUTE)
 
 	const queue = new PQueue({concurrency: 8})
 	const trips = new Map()
@@ -46,7 +47,10 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 	let nrOfTrips = 0, reqs = 0
 	const avgReqDuration = createAvgWindow(10, 300)
 	const reportStats = throttle(() => { // todo: throttle
-		out.emit('stats', {reqs, avgReqDuration: avgReqDuration.get(), trips: nrOfTrips})
+		out.emit('stats', {
+			totalReqs: reqs, avgReqDuration: avgReqDuration.get(), queuedReqs: queue.size,
+			trips: nrOfTrips
+		})
 	}, 1000)
 	const onReqTime = (reqTime) => {
 		reqs++
@@ -84,12 +88,29 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 		} catch (err) {
 			out.emit('error', err)
 		}
-		// todo: call `fetchAllTrips`?
 		setTimeout(fetchAllTiles, discoverInterval)
+		fetchAllTrips()
 	}
 	setImmediate(fetchAllTiles)
 
-	// todo: remove trip if not found or over
+	const bboxAsRectangle = polygon([[
+		[bbox.west, bbox.north],
+		[bbox.east, bbox.north],
+		[bbox.east, bbox.south],
+		[bbox.west, bbox.south],
+		[bbox.west, bbox.north] // close
+	]])
+	const isStopoverObsolete = (s) => {
+		const when = s.arrival || s.scheduledArrival || s.departure || s.scheduledDeparture
+		const inTheFuture = when && new Date(when) > Date.now()
+		if (inTheFuture) {
+			const stopLoc = point([s.stop.location.longitude, s.stop.location.latitude])
+			if (isWithin(stopLoc, bboxAsRectangle)) return true
+		}
+		return false
+	}
+
+	// todo: remove trip if not found
 	const fetchTrip = (tripId, lineName) => async () => {
 		let trip
 		try {
@@ -100,18 +121,23 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 			out.emit('error', err)
 			return
 		}
+		if (trip.stopovers.every(isStopoverObsolete)) {
+			trips.delete(tripId)
+			nrOfTrips--
+			out.emit('trip-obsolete', tripId, trip)
+			return
+		}
 
 		out.emit('trip', trip)
 		for (const stopover of trip.stopovers) out.emit('stopover', stopover, trip)
 	}
 
-	const fetchAllTrips = () => {
-		// todo: check for "queue congestion"
+	const fetchAllTrips = throttle(() => {
 		for (const [tripId, lineName] of trips.entries()) {
 			queue.add(fetchTrip(tripId, lineName)) // todo: rejection?
 		}
-		setTimeout(fetchAllTrips, trackInterval)
-	}
+		setTimeout(fetchAllTrips, interval)
+	}, interval)
 	setImmediate(fetchAllTrips)
 
 	// todo: queue on error?
