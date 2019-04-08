@@ -38,6 +38,7 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 	if (bbox.north <= bbox.south) throw new Error('bbox.north must be larger than bbox.south.')
 	if (bbox.east <= bbox.west) throw new Error('bbox.east must be larger than bbox.west.')
 	const tiles = computeTiles(bbox)
+	debug('tiles', tiles)
 
 	const discoverInterval = Math.min(interval, 3 * MINUTE)
 
@@ -59,6 +60,8 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 	}
 
 	const fetchTile = (tile) => async () => {
+		debug('fetching tile', tile)
+
 		let movements
 		try {
 			const t0 = Date.now()
@@ -75,6 +78,7 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 			out.emit('position', m.location, m)
 
 			if (trips.has(m.tripId)) continue
+			debug('unknown trip, adding', m)
 			trips.set(m.tripId, m.line && m.line.name || 'foo')
 			nrOfTrips++
 			out.emit('new-trip', m.tripId, m)
@@ -112,6 +116,8 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 
 	// todo: remove trip if not found
 	const fetchTrip = (tripId, lineName) => async () => {
+		debug('fetching trip', tripId)
+
 		let trip
 		try {
 			const t0 = Date.now()
@@ -122,6 +128,7 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 			return
 		}
 		if (trip.stopovers.every(isStopoverObsolete)) {
+			debug('trip obsolete, removing', trip)
 			trips.delete(tripId)
 			nrOfTrips--
 			out.emit('trip-obsolete', tripId, trip)
