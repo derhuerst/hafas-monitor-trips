@@ -9,12 +9,13 @@ const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
 const isWithin = require('@turf/boolean-within').default
 
-const MINUTE = 60 * 1000
+const SECOND = 1000
+const MINUTE = 60 * SECOND
 const MAX_TILE_SIZE = 5000 // 5km
 
 const roundTo = (x, d) => parseFloat(x.toFixed(d))
 const computeTiles = (bbox, cellSize) => {
-	const grid = squareGrid([bbox.west, bbox.south, bbox.east, bbox.north], 1000, {units: 'meters'})
+	const grid = squareGrid([bbox.west, bbox.south, bbox.east, bbox.north], MAX_TILE_SIZE, {units: 'meters'})
 	return grid.features.map((f) => {
 		const coords = f.geometry.coordinates[0]
 		return {
@@ -26,7 +27,7 @@ const computeTiles = (bbox, cellSize) => {
 	})
 }
 
-const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
+const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
 	}
@@ -40,7 +41,7 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 	const tiles = computeTiles(bbox)
 	debug('tiles', tiles)
 
-	const discoverInterval = Math.min(interval, 3 * MINUTE)
+	const discoverInterval = Math.max(Math.min(interval, 3 * MINUTE), 30 * SECOND)
 
 	const queue = new PQueue({concurrency: 8})
 	const trips = new Map()
@@ -66,7 +67,7 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 		try {
 			const t0 = Date.now()
 			movements = await hafas.radar(tile, {
-				results: 1000, frames: 0, polylines: false // todo: `opt.language`
+				results: 1000, duration: 0, frames: 0, polylines: false // todo: `opt.language`
 			})
 			onReqTime(Date.now() - t0)
 		} catch (err) {
@@ -86,16 +87,15 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 		}
 	}
 
+	let tilesTimer = null
 	const fetchAllTiles = async () => {
 		try {
 			await queue.addAll(tiles.map(fetchTile), {priority: 1})
 		} catch (err) {
 			out.emit('error', err)
 		}
-		setTimeout(fetchAllTiles, discoverInterval)
-		fetchAllTrips()
+		tilesTimer = setTimeout(fetchAllTiles, discoverInterval)
 	}
-	setImmediate(fetchAllTiles)
 
 	const bboxAsRectangle = polygon([[
 		[bbox.west, bbox.north],
@@ -139,17 +139,31 @@ const createMonitor = (hafas, bbox, interval, concurrency = 8) => {
 		for (const stopover of trip.stopovers) out.emit('stopover', stopover, trip)
 	}
 
+	let tripsTimer = null
 	const fetchAllTrips = throttle(() => {
 		for (const [tripId, lineName] of trips.entries()) {
 			queue.add(fetchTrip(tripId, lineName)) // todo: rejection?
 		}
-		setTimeout(fetchAllTrips, interval)
+		tripsTimer = setTimeout(fetchAllTrips, interval)
 	}, interval)
-	setImmediate(fetchAllTrips)
+
+	const start = () => {
+		fetchAllTiles()
+		.catch(() => {}) // silence rejection
+		.then(fetchAllTrips)
+	}
+	setImmediate(start)
+	const stop = () => {
+		clearInterval(tilesTimer)
+		tilesTimer = null
+		clearInterval(tripsTimer)
+		tripsTimer = null
+	}
 
 	// todo: queue on error?
 	const out = new EventEmitter()
-	// todo: stop function
+	out.start = start
+	out.stop = stop
 	return out
 }
 
