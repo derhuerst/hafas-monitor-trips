@@ -35,7 +35,9 @@
 	"peerDependencies": {
 		"hafas-client": "^4"
 	},
-	"devDependencies": {},
+	"devDependencies": {
+		"vbb-hafas": "^6.0.0"
+	},
 	"scripts": {
 		"test": "env NODE_ENV=dev node test.js",
 		"prepublishOnly": "npm test"

@@ -19,7 +19,23 @@ npm install hafas-monitor-trips
 ## Usage
 
 ```js
-todo
+const createHafas = require('vbb-hafas')
+const createMonitor = require('hafas-monitor-trips')
+
+const hafas = createHafas('hafas-monitor-trips example')
+const monitor = createMonitor(hafas, {
+	north: 52.52,
+	west: 13.36,
+	south: 52.5,
+	east: 13.39
+})
+
+monitor.on('stopover', stopover => console.log(stopover))
+monitor.on('error', console.error)
+monitor.on('stats', console.error)
+// monitor.on('trip', trip => console.log(trip))
+// monitor.on('new-trip', (tripId, t) => console.log('going to watch trip', tripId, t.line.name))
+// monitor.on('trip-obsolete', (tripId, t) => console.log('not watching trip anymore', tripId, t.line.name))
 ```
 
 
