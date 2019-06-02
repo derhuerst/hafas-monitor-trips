@@ -163,9 +163,9 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 	}
 	setImmediate(start)
 	const stop = () => {
-		clearInterval(tilesTimer)
+		clearTimeout(tilesTimer)
 		tilesTimer = null
-		clearInterval(tripsTimer)
+		clearTimeout(tripsTimer)
 		tripsTimer = null
 	}
 
