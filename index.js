@@ -36,6 +36,13 @@ const computeTiles = (bbox) => {
 	})
 }
 
+const WATCH_EVENTS = [
+	'trip', 'new-trip', 'trip-obsolete',
+	'stopover',
+	'position',
+	'stats'
+]
+
 const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
@@ -161,7 +168,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		.catch(() => {}) // silence rejection
 		.then(fetchAllTrips)
 	}
-	setImmediate(start)
+
 	const stop = () => {
 		clearTimeout(tilesTimer)
 		tilesTimer = null
@@ -171,8 +178,21 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 
 	// todo: queue on error?
 	const out = new EventEmitter()
-	out.start = start
-	out.stop = stop
+
+	let running = false
+	out.on('newListener', (eventName) => {
+		if (!WATCH_EVENTS.includes(eventName) || running) return;
+		debug('starting monitor')
+		running = true
+		start()
+	})
+	out.on('removeListener', (eventName) => {
+		if (!WATCH_EVENTS.includes(eventName) || !running) return;
+		debug('stopping monitor')
+		running = false
+		stop()
+	})
+
 	return out
 }
 
