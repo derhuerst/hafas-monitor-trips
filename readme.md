@@ -38,6 +38,8 @@ monitor.on('stats', console.error)
 // monitor.on('trip-obsolete', (tripId, t) => console.log('not watching trip anymore', tripId, t.line.name))
 ```
 
+Once you listen to any of `trip`/`new-trip`/`trip-obsolete`/`stopover`/`position`/`stats`, the monitor will automatically start to watch. Once you stop listening to each, the monitor will stop again.
+
 
 ## Contributing
 
