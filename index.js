@@ -1,6 +1,7 @@
 'use strict'
 
 const {polygon, point} = require('@turf/helpers')
+const distance = require('@turf/distance').default
 const squareGrid = require('@turf/square-grid').default
 const debug = require('debug')('hafas-monitor-trips')
 const createAvgWindow = require('live-moving-average')
@@ -11,18 +12,26 @@ const isWithin = require('@turf/boolean-within').default
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
-const MAX_TILE_SIZE = 5000 // 5km
+const MAX_TILE_SIZE = 5 // in kilometers
 
-const roundTo = (x, d) => parseFloat(x.toFixed(d))
-const computeTiles = (bbox, cellSize) => {
-	const grid = squareGrid([bbox.west, bbox.south, bbox.east, bbox.north], MAX_TILE_SIZE, {units: 'meters'})
+const roundTo = (v, d) => +v.toFixed(d)
+
+const computeTiles = (bbox) => {
+	const tileSize = Math.min(
+		distance([bbox.west, bbox.south], [bbox.east, bbox.south]), // southern edge
+		distance([bbox.east, bbox.south], [bbox.east, bbox.north]), // eastern edge
+		MAX_TILE_SIZE
+	)
+	debug('tile size', tileSize)
+
+	const grid = squareGrid([bbox.west, bbox.south, bbox.east, bbox.north], tileSize)
 	return grid.features.map((f) => {
 		const coords = f.geometry.coordinates[0]
 		return {
-			north: roundTo(coords[2][1], 4),
-			west: roundTo(coords[0][0], 4),
-			south: roundTo(coords[0][1], 4),
-			east: roundTo(coords[2][0], 4)
+			north: roundTo(coords[2][1], 6),
+			west: roundTo(coords[0][0], 6),
+			south: roundTo(coords[0][1], 6),
+			east: roundTo(coords[2][0], 6)
 		}
 	})
 }
