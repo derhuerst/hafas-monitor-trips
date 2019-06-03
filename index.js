@@ -105,6 +105,8 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 
 	let tilesTimer = null
 	const fetchAllTiles = async () => {
+		if (!running) return;
+
 		try {
 			await queue.addAll(tiles.map(fetchTile), {priority: 1})
 		} catch (err) {
@@ -132,6 +134,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 
 	// todo: remove trip if not found
 	const fetchTrip = (tripId, lineName) => async () => {
+		if (!running) return;
 		debug('fetching trip', tripId)
 
 		let trip
@@ -157,24 +160,13 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 
 	let tripsTimer = null
 	const fetchAllTrips = throttle(() => {
+		if (!running) return;
+
 		for (const [tripId, lineName] of trips.entries()) {
 			queue.add(fetchTrip(tripId, lineName)) // todo: rejection?
 		}
 		tripsTimer = setTimeout(fetchAllTrips, interval)
 	}, interval)
-
-	const start = () => {
-		fetchAllTiles()
-		.catch(() => {}) // silence rejection
-		.then(fetchAllTrips)
-	}
-
-	const stop = () => {
-		clearTimeout(tilesTimer)
-		tilesTimer = null
-		clearTimeout(tripsTimer)
-		tripsTimer = null
-	}
 
 	// todo: queue on error?
 	const out = new EventEmitter()
@@ -183,14 +175,23 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 	out.on('newListener', (eventName) => {
 		if (!WATCH_EVENTS.includes(eventName) || running) return;
 		debug('starting monitor')
+
 		running = true
-		start()
+		fetchAllTiles()
+		.catch(() => {}) // silence rejection
+		.then(fetchAllTrips)
 	})
 	out.on('removeListener', (eventName) => {
 		if (!WATCH_EVENTS.includes(eventName) || !running) return;
 		debug('stopping monitor')
+
 		running = false
-		stop()
+		queue.clear()
+		fetchAllTrips.cancel()
+		clearTimeout(tilesTimer)
+		tilesTimer = null
+		clearTimeout(tripsTimer)
+		tripsTimer = null
 	})
 
 	return out
