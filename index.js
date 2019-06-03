@@ -64,7 +64,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 
 	let nrOfTrips = 0, reqs = 0
 	const avgReqDuration = createAvgWindow(10, 300)
-	const reportStats = throttle(() => { // todo: throttle
+	const reportStats = throttle(() => {
 		out.emit('stats', {
 			totalReqs: reqs, avgReqDuration: avgReqDuration.get(), queuedReqs: queue.size,
 			trips: nrOfTrips
@@ -101,18 +101,6 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 			out.emit('new-trip', m.tripId, m)
 			// todo: processs `m.nextStopovers`
 		}
-	}
-
-	let tilesTimer = null
-	const fetchAllTiles = async () => {
-		if (!running) return;
-
-		try {
-			await queue.addAll(tiles.map(fetchTile), {priority: 1})
-		} catch (err) {
-			out.emit('error', err)
-		}
-		tilesTimer = setTimeout(fetchAllTiles, discoverInterval)
 	}
 
 	const bboxAsRectangle = polygon([[
@@ -158,7 +146,21 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		for (const stopover of trip.stopovers) out.emit('stopover', stopover, trip)
 	}
 
+	let running = false
+	let tilesTimer = null
 	let tripsTimer = null
+
+	const fetchAllTiles = async () => {
+		if (!running) return;
+
+		try {
+			await queue.addAll(tiles.map(fetchTile), {priority: 1})
+		} catch (err) {
+			out.emit('error', err)
+		}
+		tilesTimer = setTimeout(fetchAllTiles, discoverInterval)
+	}
+
 	const fetchAllTrips = throttle(() => {
 		if (!running) return;
 
@@ -171,7 +173,6 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 	// todo: queue on error?
 	const out = new EventEmitter()
 
-	let running = false
 	out.on('newListener', (eventName) => {
 		if (!WATCH_EVENTS.includes(eventName) || running) return;
 		debug('starting monitor')
