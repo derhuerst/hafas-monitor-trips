@@ -1,40 +1,17 @@
 'use strict'
 
 const {polygon, point} = require('@turf/helpers')
-const distance = require('@turf/distance').default
-const squareGrid = require('@turf/square-grid').default
 const debug = require('debug')('hafas-monitor-trips')
-const createAvgWindow = require('live-moving-average')
 const {default: PQueue} = require('p-queue')
 const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
 const isWithin = require('@turf/boolean-within').default
+const computeTiles = require('./lib/compute-tiles')
+const createReqCounter = require('./lib/req-counter')
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const MAX_TILE_SIZE = 5 // in kilometers
-
-const roundTo = (v, d) => +v.toFixed(d)
-
-const computeTiles = (bbox) => {
-	const tileSize = Math.min(
-		distance([bbox.west, bbox.south], [bbox.east, bbox.south]), // southern edge
-		distance([bbox.east, bbox.south], [bbox.east, bbox.north]), // eastern edge
-		MAX_TILE_SIZE
-	)
-	debug('tile size', tileSize)
-
-	const grid = squareGrid([bbox.west, bbox.south, bbox.east, bbox.north], tileSize)
-	return grid.features.map((f) => {
-		const coords = f.geometry.coordinates[0]
-		return {
-			north: roundTo(coords[2][1], 6),
-			west: roundTo(coords[0][0], 6),
-			south: roundTo(coords[0][1], 6),
-			east: roundTo(coords[2][0], 6)
-		}
-	})
-}
 
 const WATCH_EVENTS = [
 	'trip', 'new-trip', 'trip-obsolete',
@@ -48,12 +25,6 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		throw new Error('Invalid HAFAS client passed.')
 	}
 
-	if ('number' !== typeof bbox.north) throw new TypeError('bbox.north must be a number.')
-	if ('number' !== typeof bbox.west) throw new TypeError('bbox.west must be a number.')
-	if ('number' !== typeof bbox.south) throw new TypeError('bbox.south must be a number.')
-	if ('number' !== typeof bbox.east) throw new TypeError('bbox.east must be a number.')
-	if (bbox.north <= bbox.south) throw new Error('bbox.north must be larger than bbox.south.')
-	if (bbox.east <= bbox.west) throw new Error('bbox.east must be larger than bbox.west.')
 	const tiles = computeTiles(bbox)
 	debug('tiles', tiles)
 
@@ -62,34 +33,34 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 	const queue = new PQueue({concurrency: 8})
 	const trips = new Map()
 
-	let nrOfTrips = 0, reqs = 0
-	const avgReqDuration = createAvgWindow(10, 300)
+	let nrOfTrips = 0
+	const reqCounter = createReqCounter()
 	const reportStats = throttle(() => {
 		out.emit('stats', {
-			totalReqs: reqs, avgReqDuration: avgReqDuration.get(), queuedReqs: queue.size,
+			...reqCounter.getStats(),
+			queuedReqs: queue.size,
 			trips: nrOfTrips
 		})
 	}, 1000)
 	const onReqTime = (reqTime) => {
-		reqs++
-		avgReqDuration.push(reqTime)
+		reqCounter.onReqTime(reqTime)
 		reportStats()
 	}
 
 	const fetchTile = (tile) => async () => {
 		debug('fetching tile', tile)
 
+		const t0 = Date.now()
 		let movements
 		try {
-			const t0 = Date.now()
 			movements = await hafas.radar(tile, {
 				results: 1000, duration: 0, frames: 0, polylines: false // todo: `opt.language`
 			})
-			onReqTime(Date.now() - t0)
 		} catch (err) {
 			out.emit('error', err)
 			return
 		}
+		onReqTime(Date.now() - t0)
 
 		for (const m of movements) {
 			out.emit('position', m.location, m)
