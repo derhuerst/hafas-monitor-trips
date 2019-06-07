@@ -158,7 +158,8 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		} catch (err) {
 			out.emit('error', err)
 		}
-		tilesTimer = setTimeout(fetchAllTiles, discoverInterval)
+
+		if (running) tilesTimer = setTimeout(fetchAllTiles, discoverInterval)
 	}
 
 	const fetchAllTrips = throttle(() => {
@@ -167,6 +168,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		for (const [tripId, lineName] of trips.entries()) {
 			queue.add(fetchTrip(tripId, lineName)) // todo: rejection?
 		}
+
 		tripsTimer = setTimeout(fetchAllTrips, interval)
 	}, interval)
 
