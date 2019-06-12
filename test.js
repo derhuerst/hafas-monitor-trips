@@ -8,6 +8,8 @@ const bbox = {north: 52.52, west: 13.36, south: 52.5, east: 13.39}
 const hafas = createHafas('hafas-monitor-trips example')
 const monitor = createMonitor(hafas, bbox, 4 * 1000)
 
+a.strictEqual(monitor.hafas, hafas)
+
 monitor.once('error', (err) => {
 	console.error(err)
 	process.exit(1)

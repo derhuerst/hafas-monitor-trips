@@ -168,6 +168,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		tripsTimer = null
 	})
 
+	out.hafas = hafas
 	return out
 }
 
