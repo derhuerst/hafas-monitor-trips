@@ -83,12 +83,10 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 	]])
 	const isStopoverObsolete = (s) => {
 		const when = s.arrival || s.scheduledArrival || s.departure || s.scheduledDeparture
-		const inTheFuture = when && new Date(when) > Date.now()
-		if (inTheFuture) {
-			const stopLoc = point([s.stop.location.longitude, s.stop.location.latitude])
-			if (isWithin(stopLoc, bboxAsRectangle)) return true
-		}
-		return false
+		const inThePast = when && new Date(when) < (Date.now() - 5 * MINUTE)
+		if (!inThePast) return false
+		const stopLoc = point([s.stop.location.longitude, s.stop.location.latitude])
+		return !isWithin(stopLoc, bboxAsRectangle)
 	}
 
 	// todo: remove trip if not found
