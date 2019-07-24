@@ -20,7 +20,10 @@ const WATCH_EVENTS = [
 	'stats'
 ]
 
-const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => {
+const LONG_QUEUE_MSG = 'many queued requests, consider monitoring a smaller' +
+	' bbox or increasing the concurrency'
+
+const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
 	}
@@ -39,8 +42,10 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 		out.emit('stats', {
 			...reqCounter.getStats(),
 			queuedReqs: queue.size,
-			trips: nrOfTrips
+			trips: nrOfTrips,
+			tiles: tiles.length
 		})
+		if (queue.size > trips * 1.5) debug(LONG_QUEUE_MSG)
 	}, 1000)
 	const onReqTime = (reqTime) => {
 		reqCounter.onReqTime(reqTime)
@@ -66,7 +71,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 			out.emit('position', m.location, m)
 
 			if (trips.has(m.tripId)) continue
-			debug('unknown trip, adding', m)
+			debug('unknown trip, adding', m.tripId)
 			trips.set(m.tripId, m.line && m.line.name || 'foo')
 			nrOfTrips++
 			out.emit('new-trip', m.tripId, m)
@@ -104,7 +109,7 @@ const createMonitor = (hafas, bbox, interval = 60 * MINUTE, concurrency = 8) => 
 			return
 		}
 		if (trip.stopovers.every(isStopoverObsolete)) {
-			debug('trip obsolete, removing', trip)
+			debug('trip obsolete, removing', trip.stopovers.map(s => [s.stop.location, s.arrival]))
 			trips.delete(tripId)
 			nrOfTrips--
 			out.emit('trip-obsolete', tripId, trip)
