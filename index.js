@@ -23,12 +23,12 @@ const WATCH_EVENTS = [
 const LONG_QUEUE_MSG = 'many queued requests, consider monitoring a smaller' +
 	' bbox or increasing the concurrency'
 
-const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8) => {
+const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileSize = 5) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
 	}
 
-	const tiles = computeTiles(bbox)
+	const tiles = computeTiles(bbox, {maxTileSize})
 	debug('tiles', tiles)
 
 	const discoverInterval = Math.max(Math.min(interval, 3 * MINUTE), 30 * SECOND)
