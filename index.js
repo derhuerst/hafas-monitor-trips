@@ -117,7 +117,13 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8) => {
 		}
 
 		out.emit('trip', trip)
-		for (const stopover of trip.stopovers) out.emit('stopover', stopover, trip)
+		for (const stopover of trip.stopovers) {
+			out.emit('stopover', {
+				tripId: trip.id,
+				line: trip.line,
+				...stopover
+			}, trip)
+		}
 	}
 
 	let running = false
@@ -158,6 +164,7 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8) => {
 		.catch(() => {}) // silence rejection
 		.then(fetchAllTrips)
 	})
+	// todo: should still be watching after on() on() off() [bug]
 	out.on('removeListener', (eventName) => {
 		if (!WATCH_EVENTS.includes(eventName) || !running) return;
 		debug('stopping monitor')

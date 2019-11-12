@@ -38,6 +38,8 @@ const onStopover = spy((s, t) => {
 	a.ok('departureDelay' in s)
 	a.ok('departurePlatform' in s)
 
+	a.ok(s.tripId)
+	a.ok(s.line)
 	validateTrip(t)
 })
 monitor.on('stopover', onStopover)
