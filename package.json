@@ -38,7 +38,7 @@
 		"hafas-client": "^4"
 	},
 	"devDependencies": {
-		"vbb-hafas": "^6.0.0"
+		"vbb-hafas": "^7.0.0"
 	},
 	"scripts": {
 		"test": "env NODE_ENV=dev node test.js",
