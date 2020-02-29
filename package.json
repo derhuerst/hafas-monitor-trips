@@ -22,7 +22,7 @@
 	"bugs": "https://github.com/derhuerst/hafas-monitor-trips/issues",
 	"license": "ISC",
 	"engines": {
-		"node": ">=8"
+		"node": ">=10"
 	},
 	"dependencies": {
 		"@turf/boolean-within": "^6.0.1",
@@ -35,10 +35,10 @@
 		"p-queue": "^6.0.1"
 	},
 	"peerDependencies": {
-		"hafas-client": "^4"
+		"hafas-client": "^5"
 	},
 	"devDependencies": {
-		"vbb-hafas": "^6.0.0"
+		"vbb-hafas": "^7.0.1"
 	},
 	"scripts": {
 		"test": "env NODE_ENV=dev node test.js",

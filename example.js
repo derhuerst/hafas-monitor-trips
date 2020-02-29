@@ -10,7 +10,9 @@ const hafas = createHafas('hafas-monitor-trips example')
 const monitor = createMonitor(hafas, bbox, interval)
 
 monitor.on('stopover', (stopover, trip) => {
-	console.log(trip.id, trip.line.name, 'next', stopover.stop.name, stopover.departure || stopover.arrival)
+	const dep = stopover.departure || stopover.plannedDeparture
+	const arr = stopover.arrival || stopover.plannedArrival
+	console.log(trip.id, trip.line.name, 'next', stopover.stop.name, dep || arr)
 })
 monitor.on('position', (location, movement) => {
 	console.log(movement.tripId, movement.line.name, 'pos', location.latitude, location.longitude)

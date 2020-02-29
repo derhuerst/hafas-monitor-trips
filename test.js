@@ -32,9 +32,11 @@ const validateTrip = (t) => {
 const onStopover = spy((s, t) => {
 	a.ok(s.stop)
 	a.ok('arrival' in s)
+	a.ok('plannedArrival' in s)
 	a.ok('arrivalDelay' in s)
 	a.ok('arrivalPlatform' in s)
 	a.ok('departure' in s)
+	a.ok('plannedDeparture' in s)
 	a.ok('departureDelay' in s)
 	a.ok('departurePlatform' in s)
 

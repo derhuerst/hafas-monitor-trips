@@ -87,7 +87,7 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 		[bbox.west, bbox.north] // close
 	]])
 	const isStopoverObsolete = (s) => {
-		const when = s.arrival || s.scheduledArrival || s.departure || s.scheduledDeparture
+		const when = s.arrival || s.plannedArrival || s.departure || s.plannedDeparture
 		const inThePast = when && new Date(when) < (Date.now() - 5 * MINUTE)
 		if (!inThePast) return false
 		const stopLoc = point([s.stop.location.longitude, s.stop.location.latitude])
@@ -109,7 +109,7 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 			return
 		}
 		if (trip.stopovers.every(isStopoverObsolete)) {
-			debug('trip obsolete, removing', trip.stopovers.map(s => [s.stop.location, s.arrival]))
+			debug('trip obsolete, removing', trip.stopovers.map(s => [s.stop.location, s.arrival || s.plannedArrival]))
 			trips.delete(tripId)
 			nrOfTrips--
 			out.emit('trip-obsolete', tripId, trip)
