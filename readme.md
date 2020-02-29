@@ -18,6 +18,8 @@ npm install hafas-monitor-trips
 
 ## Usage
 
+*Note:* This package only works with [`hafas-client@5`](https://github.com/public-transport/hafas-client/tree/5)-compatible API clients.
+
 ```js
 const createHafas = require('vbb-hafas')
 const createMonitor = require('hafas-monitor-trips')
