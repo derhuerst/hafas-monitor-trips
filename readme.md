@@ -8,10 +8,12 @@
 [![chat with me on Gitter](https://img.shields.io/badge/chat%20with%20me-on%20gitter-512e92.svg)](https://gitter.im/derhuerst)
 [![support me on Patreon](https://img.shields.io/badge/support%20me-on%20patreon-fa7664.svg)](https://patreon.com/derhuerst)
 
+`hafas-monitor-trips` will periodically refresh the list of watched trips by querying the whole bounding box. It will then refresh each watched trip individually to get up-to-date data about its stopovers.
+
 
 ## Installation
 
-*Note:* `hafas-monitor-trips` needs access to a [Redis](https://redis.io/) instance with [Pub/Sub](https://redis.io/topics/pubsub) support. Set the `REDIS_URL` environment variable to configure access to it.
+*Note:* `hafas-monitor-trips` needs access to [Redis](https://redis.io/). Set the `REDIS_URL` environment variable to configure access to it.
 
 ```shell
 npm install hafas-monitor-trips
