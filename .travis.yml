@@ -4,6 +4,9 @@ node_js:
   - 'lts/*'
   - '10'
 cache: npm
+script:
+  - npm run lint
+  - npm test
 notifications:
   email:
     on_success: never
