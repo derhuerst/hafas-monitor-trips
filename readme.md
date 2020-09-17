@@ -11,6 +11,8 @@
 
 ## Installation
 
+*Note:* `hafas-monitor-trips` needs access to a [Redis](https://redis.io/) instance with [Pub/Sub](https://redis.io/topics/pubsub) support. Set the `REDIS_URL` environment variable to configure access to it.
+
 ```shell
 npm install hafas-monitor-trips
 ```
