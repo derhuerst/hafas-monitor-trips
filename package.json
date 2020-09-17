@@ -38,10 +38,12 @@
 		"hafas-client": "^5"
 	},
 	"devDependencies": {
+		"eslint": "^7.6.0",
 		"vbb-hafas": "^7.0.1"
 	},
 	"scripts": {
+		"lint": "eslint .",
 		"test": "env NODE_ENV=dev node test.js",
-		"prepublishOnly": "npm test"
+		"prepublishOnly": "npm run lint && npm test"
 	}
 }
