@@ -31,7 +31,7 @@
 		"@turf/square-grid": "^6.0.2",
 		"debug": "^4.1.1",
 		"ioredis": "^4.17.3",
-		"live-moving-average": "^0.1.1",
+		"live-moving-average": "^1.0.0",
 		"lodash.throttle": "^4.1.1",
 		"p-queue": "^6.0.1"
 	},
@@ -44,7 +44,7 @@
 	},
 	"scripts": {
 		"lint": "eslint .",
-		"test": "redis-cli flushdb && env NODE_ENV=dev node test.js",
+		"test": "redis-cli flushdb && env DEBUG='hafas-monitor-trips:*' node test.js",
 		"redis": "printf 'save\nappendonly no' | redis-server - >/dev/null",
 		"prepublishOnly": "npm run lint && npm test"
 	}

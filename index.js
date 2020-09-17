@@ -1,13 +1,14 @@
 'use strict'
 
-const {polygon, point} = require('@turf/helpers')
 const debug = require('debug')('hafas-monitor-trips')
+const debugTrips = require('debug')('hafas-monitor-trips:trips')
+const debugFetch = require('debug')('hafas-monitor-trips:fetch')
 const {default: PQueue} = require('p-queue')
 const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
-const isWithin = require('@turf/boolean-within').default
 const computeTiles = require('./lib/compute-tiles')
 const createReqCounter = require('./lib/req-counter')
+const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
@@ -23,7 +24,7 @@ const WATCH_EVENTS = [
 const LONG_QUEUE_MSG = 'many queued requests, consider monitoring a smaller' +
 	' bbox or increasing the concurrency'
 
-const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileSize = 5) => {
+const createMonitor = (hafas, bbox, fetchTripsInterval = MINUTE, concurrency = 8, maxTileSize = 5) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
 	}
@@ -31,7 +32,8 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 	const tiles = computeTiles(bbox, {maxTileSize})
 	debug('tiles', tiles)
 
-	const discoverInterval = Math.max(Math.min(interval, 3 * MINUTE), 30 * SECOND)
+	const fetchTilesInterval = Math.max(Math.min(fetchTripsInterval, 3 * MINUTE), 30 * SECOND)
+	debug('fetchTilesInterval', fetchTilesInterval)
 
 	const queue = new PQueue({concurrency: 8})
 	const trips = new Map()
@@ -53,7 +55,7 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 	}
 
 	const fetchTile = (tile) => async () => {
-		debug('fetching tile', tile)
+		debugFetch('fetching tile', tile)
 
 		const t0 = Date.now()
 		let movements
@@ -71,7 +73,7 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 			out.emit('position', m.location, m)
 
 			if (trips.has(m.tripId)) continue
-			debug('unknown trip, adding', m.tripId)
+			debugTrips('unknown trip, adding', m.tripId)
 			trips.set(m.tripId, m.line && m.line.name || 'foo')
 			nrOfTrips++
 			out.emit('new-trip', m.tripId, m)
@@ -79,25 +81,11 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 		}
 	}
 
-	const bboxAsRectangle = polygon([[
-		[bbox.west, bbox.north],
-		[bbox.east, bbox.north],
-		[bbox.east, bbox.south],
-		[bbox.west, bbox.south],
-		[bbox.west, bbox.north] // close
-	]])
-	const isStopoverObsolete = (s) => {
-		const when = s.arrival || s.plannedArrival || s.departure || s.plannedDeparture
-		const inThePast = when && new Date(when) < (Date.now() - 5 * MINUTE)
-		if (!inThePast) return false
-		const stopLoc = point([s.stop.location.longitude, s.stop.location.latitude])
-		return !isWithin(stopLoc, bboxAsRectangle)
-	}
-
+	const isStopoverObsolete = createIsStopoverObsolete(bbox)
 	// todo: remove trip if not found
 	const fetchTrip = (tripId, lineName) => async () => {
 		if (!running) return;
-		debug('fetching trip', tripId)
+		debugFetch('fetching trip', tripId)
 
 		let trip
 		try {
@@ -109,7 +97,7 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 			return
 		}
 		if (trip.stopovers.every(isStopoverObsolete)) {
-			debug('trip obsolete, removing', trip.stopovers.map(s => [s.stop.location, s.arrival || s.plannedArrival]))
+			debugTrips('trip obsolete, removing', trip.stopovers.map(s => [s.stop.location, s.arrival || s.plannedArrival]))
 			trips.delete(tripId)
 			nrOfTrips--
 			out.emit('trip-obsolete', tripId, trip)
@@ -127,8 +115,8 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 	}
 
 	let running = false
-	let tilesTimer = null
-	let tripsTimer = null
+	let fetchTilesTimer = null
+	let fetchTripsTimer = null
 
 	const fetchAllTiles = async () => {
 		if (!running) return;
@@ -139,7 +127,9 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 			out.emit('error', err)
 		}
 
-		if (running) tilesTimer = setTimeout(fetchAllTiles, discoverInterval)
+		if (running) {
+			fetchTilesTimer = setTimeout(fetchAllTiles, fetchTilesInterval)
+		}
 	}
 
 	const fetchAllTrips = throttle(() => {
@@ -149,8 +139,10 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 			queue.add(fetchTrip(tripId, lineName)) // todo: rejection?
 		}
 
-		tripsTimer = setTimeout(fetchAllTrips, interval)
-	}, interval)
+		if (running) {
+			fetchTripsTimer = setTimeout(fetchAllTrips, fetchTripsInterval)
+		}
+	}, fetchTripsInterval)
 
 	// todo: queue on error?
 	const out = new EventEmitter()
@@ -161,8 +153,8 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 
 		running = true
 		fetchAllTiles()
-		.catch(() => {}) // silence rejection
 		.then(fetchAllTrips)
+		.catch(() => {}) // silence rejection
 	})
 	// todo: should still be watching after on() on() off() [bug]
 	out.on('removeListener', (eventName) => {
@@ -172,10 +164,10 @@ const createMonitor = (hafas, bbox, interval = MINUTE, concurrency = 8, maxTileS
 		running = false
 		queue.clear()
 		fetchAllTrips.cancel()
-		clearTimeout(tilesTimer)
-		tilesTimer = null
-		clearTimeout(tripsTimer)
-		tripsTimer = null
+		clearTimeout(fetchTilesTimer)
+		fetchTilesTimer = null
+		clearTimeout(fetchTripsTimer)
+		fetchTripsTimer = null
 	})
 
 	out.hafas = hafas

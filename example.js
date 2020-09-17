@@ -1,13 +1,20 @@
 'use strict'
 
-const createHafas = require('vbb-hafas')
+const createThrottledHafas = require('vbb-hafas/throttle')
 const createMonitor = require('.')
 
-const bbox = {north: 52.52, west: 13.36, south: 52.5, east: 13.39}
-const interval = 2 * 60 * 1000 // every two minutes
+const potsdamerPlatz = {
+	north: 52.52,
+	west: 13.36,
+	south: 52.5,
+	east: 13.39,
+}
+const bbox = process.env.BBOX
+	? JSON.parse(process.env.BBOX)
+	: potsdamerPlatz
 
-const hafas = createHafas('hafas-monitor-trips example')
-const monitor = createMonitor(hafas, bbox, interval)
+const userAgent = 'hafas-monitor-trips example'
+const hafas = createThrottledHafas(userAgent, 5, 1000) // 5 req/s
 
 monitor.on('stopover', (stopover, trip) => {
 	const dep = stopover.departure || stopover.plannedDeparture
