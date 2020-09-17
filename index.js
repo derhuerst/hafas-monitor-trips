@@ -5,8 +5,11 @@ const debugTrips = require('debug')('hafas-monitor-trips:trips')
 const debugFetch = require('debug')('hafas-monitor-trips:fetch')
 const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
+const Redis = require('ioredis')
 const computeTiles = require('./lib/compute-tiles')
+const redisOpts = require('./lib/redis-opts')
 const createReqCounter = require('./lib/req-counter')
+const createWatchedTrips = require('./lib/watched-trips')
 const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
 
 const SECOND = 1000
@@ -43,29 +46,25 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	const out = new EventEmitter()
 
-	const trips = new Map()
-	let nrOfTrips = 0
-	const tripSeen = (id, lineName) => {
-		if (trips.has(id)) return;
-		debugTrips('unknown trip, adding', id, lineName)
-		trips.set(id, lineName)
-		nrOfTrips++
+	const redis = new Redis(redisOpts)
+	const watchedTrips = createWatchedTrips(redis, fetchTilesInterval * 1.5)
+	const tripSeen = async (id, lineName) => {
+		debugTrips('trip seen', id, lineName)
+		await watchedTrips.put(id, lineName)
 	}
-	const tripObsolete = (id) => {
-		if (!trips.has(id)) return;
-		debugTrips('obsolete trip, removing', id)
-		trips.delete(id)
-		nrOfTrips--
+	const tripObsolete = async (id) => {
+		debugTrips('trip obsolete, removing', id)
+		await watchedTrips.del(id)
 	}
 
 	const reqCounter = createReqCounter()
-	const reportStats = throttle(() => {
+	const reportStats = throttle(async () => {
 		const tSinceFetchAllTiles = Date.now() - tLastFetchTiles
 		const tSinceFetchAllTrips = Date.now() - tLastFetchTrips
 		out.emit('stats', {
 			...reqCounter.getStats(),
 			running,
-			nrOfTrips,
+			nrOfTrips: await watchedTrips.count(),
 			nrOfTiles: tiles.length,
 			tSinceFetchAllTiles, tSinceFetchAllTrips,
 		})
@@ -93,13 +92,15 @@ const createMonitor = (hafas, bbox, opt) => {
 		onReqTime(Date.now() - t0)
 
 		for (const m of movements) {
-			const lineName = m.line && m.line.name || 'foo'
 			const loc = m.location
-			debugFetch(m.tripId, lineName, loc.latitude, loc.longitude)
+			debugFetch(m.tripId, m.line && m.line.name, loc.latitude, loc.longitude)
 
 			out.emit('position', loc, m)
-			tripSeen(m.tripId, lineName)
 		}
+
+		await Promise.all(movements.map(async (m) => {
+			await tripSeen(m.tripId, m.line && m.line.name || '')
+		}))
 	}
 
 	const isStopoverObsolete = createIsStopoverObsolete(bbox)
@@ -114,7 +115,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		if (trip.stopovers.every(isStopoverObsolete)) {
 			const st = trip.stopovers.map(s => [s.stop.location, s.arrival || s.plannedArrival])
 			debugTrips('trip obsolete', id, lineName, st)
-			tripObsolete(id)
+			await tripObsolete(id)
 			return;
 		}
 
@@ -127,7 +128,7 @@ const createMonitor = (hafas, bbox, opt) => {
 			}, trip)
 		}
 
-		tripSeen(trip.id, trip.line && trip.line.name || '')
+		await tripSeen(trip.id, trip.line && trip.line.name || '')
 	}
 
 	let running = false
@@ -159,7 +160,7 @@ const createMonitor = (hafas, bbox, opt) => {
 
 		try {
 			const jobs = []
-			for (const [id, lineName] of trips.entries()) {
+			for await (const [id, lineName] of watchedTrips.entries()) {
 				jobs.push(fetchTrip(id, lineName))
 			}
 			await Promise.all(jobs)
@@ -193,6 +194,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		fetchTilesTimer = null
 		clearTimeout(fetchTripsTimer)
 		fetchTripsTimer = null
+		out.emit('stop')
 	}
 
 	setImmediate(start)
