@@ -16,17 +16,21 @@ const bbox = process.env.BBOX
 const userAgent = 'hafas-monitor-trips example'
 const hafas = createThrottledHafas(userAgent, 5, 1000) // 5 req/s
 
-monitor.on('stopover', (stopover, trip) => {
-	const dep = stopover.departure || stopover.plannedDeparture
-	const arr = stopover.arrival || stopover.plannedArrival
-	console.log(trip.id, trip.line.name, 'next', stopover.stop.name, dep || arr)
+const monitor = createMonitor(hafas, bbox, {
+	fetchTripsInterval: 10_000, // 10s
 })
-monitor.on('position', (location, movement) => {
-	console.log(movement.tripId, movement.line.name, 'pos', location.latitude, location.longitude)
+monitor.once('error', (err) => {
+	console.error(err)
+	process.exit(1)
 })
-// monitor.on('trip', trip => console.log(trip.stopovers))
-// monitor.on('new-trip', (tripId, t) => console.log('going to watch trip', tripId, t.line.name))
-// monitor.on('trip-obsolete', (tripId, t) => console.log('not watching trip anymore', tripId, t.line.name))
-
-monitor.on('error', console.error)
 monitor.on('stats', console.error)
+
+monitor.on('stopover', (st) => {
+	process.stdout.write(JSON.stringify(st) + '\n')
+})
+// monitor.on('trip', (trip) => {
+// 	console.log(trip.stopovers)
+// })
+// monitor.on('position', (loc, movement) => {
+// 	console.log(movement.tripId, movement.line.name, 'pos', loc.latitude, loc.longitude)
+// })

@@ -22,29 +22,43 @@ npm install hafas-monitor-trips
 
 ## Usage
 
-*Note:* This package only works with [`hafas-client@5`](https://github.com/public-transport/hafas-client/tree/5)-compatible API clients.
+In the following example, we'll keep things simple:
+
+- We use [`vbb-hafas`](https://github.com/public-transport/vbb-hafas), a HAFAS client querying endpoint of the Berlin & Brandenburg public transport service (VBB).
+- We monitor a small bounding box in the center of Berlin.
+- We `console.log` all `stopover`s (a stopover is a vehicle stopping at a stop/station at a specific point in time) monitored.
+
+*Note:* `hafas-monitor-trips` only works with [`hafas-client@5`](https://github.com/public-transport/hafas-client/tree/5)-compatible API clients.
 
 ```js
 const createHafas = require('vbb-hafas')
 const createMonitor = require('hafas-monitor-trips')
 
-const hafas = createHafas('hafas-monitor-trips example')
-const monitor = createMonitor(hafas, {
+const bbox = { // Potsdamer Platz in Berlin
 	north: 52.52,
 	west: 13.36,
 	south: 52.5,
-	east: 13.39
-})
+	east: 13.39,
+}
 
+const hafas = createHafas('hafas-monitor-trips example')
+const monitor = createMonitor(hafas, bbox)
+
+monitor.on('error', err => console.error(err))
+monitor.on('stats', stats => console.error(stats))
 monitor.on('stopover', stopover => console.log(stopover))
-monitor.on('error', console.error)
-monitor.on('stats', console.error)
-// monitor.on('trip', trip => console.log(trip))
-// monitor.on('new-trip', (tripId, t) => console.log('going to watch trip', tripId, t.line.name))
-// monitor.on('trip-obsolete', (tripId, t) => console.log('not watching trip anymore', tripId, t.line.name))
 ```
 
-Once you listen to any of `trip`/`new-trip`/`trip-obsolete`/`stopover`/`position`/`stats`, the monitor will automatically start to watch. Once you stop listening to each, the monitor will stop again.
+*Note:* With a bounding larger than a few km², there will be so many HAFAS calls made that you will likely get **rate-limited by the endpoint**. One way to handle this, instead of passing a `hafas-client` instance directly into `hafas-monitor-trips`, is to **use e.g. [`hafas-client-rpc`](https://github.com/derhuerst/hafas-client-rpc) to distribute the requests** to a pool of worker machines.
+
+You can listen for these events:
+
+- `error` – An error occured, e.g. a network error.
+- `stats` – Stats about the monitoring process, e.g. nr of requests sent.
+- `too-many-queued` – There seem to bw too many requests queued. Pick a smaller bounding box, or increase the request speed (e.g. by using more workers as explained above).
+- `trip` – Every trip that has been fetched.
+- `stopover` – Each stopover of every trip that has been fetched.
+- `position` – The current (estimated) position of a vehicle.
 
 
 ## Contributing
