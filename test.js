@@ -5,8 +5,10 @@ const a = require('assert')
 const createMonitor = require('.')
 
 const bbox = {north: 52.52, west: 13.36, south: 52.5, east: 13.39}
-const hafas = createHafas('hafas-monitor-trips example')
-const monitor = createMonitor(hafas, bbox, 4 * 1000)
+const hafas = createHafas('hafas-monitor-trips test')
+const monitor = createMonitor(hafas, bbox, {
+	fetchTripsInterval: 4 * 1000,
+})
 
 a.strictEqual(monitor.hafas, hafas)
 
@@ -26,7 +28,7 @@ const spy = (fn) => {
 const validateTrip = (t) => {
 	a.ok(t.id)
 	a.ok(t.line)
-	a.ok(t.direction)
+	if (t.direction !== null) a.ok(t.direction)
 }
 
 const onStopover = spy((s, t) => {
@@ -63,8 +65,11 @@ let statsEvents = 0
 const onStats = (s) => {
 	a.ok('totalReqs' in s)
 	a.ok('avgReqDuration' in s)
-	a.ok('queuedReqs' in s)
-	a.ok('trips' in s)
+	a.ok('running' in s)
+	a.ok('nrOfTrips' in s)
+	a.ok('nrOfTiles' in s)
+	a.ok('tSinceFetchAllTiles' in s)
+	a.ok('tSinceFetchAllTrips' in s)
 
 	if (++statsEvents >= 10) {
 		a.ok(onStopover.called, 'stopover not emitted')
@@ -76,6 +81,8 @@ const onStats = (s) => {
 		monitor.removeListener('trip', onTrip)
 		monitor.removeListener('position', onPosition)
 		monitor.removeListener('stats', onStats)
+
+		process.exit()
 	}
 }
 monitor.on('stats', onStats)
