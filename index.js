@@ -8,6 +8,7 @@ const {EventEmitter} = require('events')
 const Redis = require('ioredis')
 const computeTiles = require('./lib/compute-tiles')
 const redisOpts = require('./lib/redis-opts')
+const noCache = require('./lib/no-cache')
 const createReqCounter = require('./lib/req-counter')
 const createWatchedTrips = require('./lib/watched-trips')
 const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
@@ -88,6 +89,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		const movements = await hafas.radar(tile, {
 			results: 1000, duration: 0, frames: 0, polylines: false,
 			// todo: `opt.language`
+			...noCache,
 		})
 		onReqTime(Date.now() - t0)
 
@@ -109,7 +111,10 @@ const createMonitor = (hafas, bbox, opt) => {
 
 		const t0 = Date.now()
 		// todo: remove trip if not found
-		const trip = await hafas.trip(id, lineName) // todo: `opt.language`
+		const trip = await hafas.trip(id, lineName, {
+			// todo: `opt.language`
+			...noCache,
+		})
 		onReqTime(Date.now() - t0)
 
 		if (trip.stopovers.every(isStopoverObsolete)) {
