@@ -110,11 +110,21 @@ const createMonitor = (hafas, bbox, opt) => {
 		debugFetch('fetching trip', id, lineName)
 
 		const t0 = Date.now()
-		// todo: remove trip if not found
-		const trip = await hafas.trip(id, lineName, {
-			// todo: `opt.language`
-			...noCache,
-		})
+		let trip
+		try {
+			// todo: remove trip if not found
+			trip = await hafas.trip(id, lineName, {
+				// todo: `opt.language`
+				...noCache,
+			})
+		} catch (err) {
+			if (err && err.isHafasError) {
+				debugFetch('hafas error', err)
+				out.emit('hafas-error', err)
+				return;
+			}
+			throw err
+		}
 		onReqTime(Date.now() - t0)
 
 		if (trip.stopovers.every(isStopoverObsolete)) {

@@ -45,6 +45,7 @@ const hafas = createHafas('hafas-monitor-trips example')
 const monitor = createMonitor(hafas, bbox)
 
 monitor.on('error', err => console.error(err))
+monitor.on('hafas-error', err => console.error(err))
 monitor.on('stats', stats => console.error(stats))
 monitor.on('stopover', stopover => console.log(stopover))
 ```
@@ -54,6 +55,7 @@ monitor.on('stopover', stopover => console.log(stopover))
 You can listen for these events:
 
 - `error` – An error occured, e.g. a network error.
+- `hafas-error` – The HAFAS endpoint rejected a request with an error.
 - `stats` – Stats about the monitoring process, e.g. nr of requests sent.
 - `too-many-queued` – There seem to bw too many requests queued. Pick a smaller bounding box, or increase the request speed (e.g. by using more workers as explained above).
 - `trip` – Every trip that has been fetched.
