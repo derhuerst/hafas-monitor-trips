@@ -23,6 +23,7 @@ monitor.once('error', (err) => {
 	console.error(err)
 	process.exit(1)
 })
+monitor.on('hafas-error', console.error)
 monitor.on('stats', console.error)
 
 monitor.on('stopover', (st) => {
