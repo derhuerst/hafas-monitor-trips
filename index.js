@@ -68,6 +68,8 @@ const createMonitor = (hafas, bbox, opt) => {
 			nrOfTrips: await watchedTrips.count(),
 			nrOfTiles: tiles.length,
 			tSinceFetchAllTiles, tSinceFetchAllTrips,
+			totalHafasErrors,
+			tSinceHafasError: Date.now() - tLastHafasError,
 		})
 		if (
 			tSinceFetchAllTiles > fetchTilesInterval * 1.5 ||
@@ -82,6 +84,8 @@ const createMonitor = (hafas, bbox, opt) => {
 		reportStats().catch(err => out.emit('error', err))
 	}
 
+	let totalHafasErrors = 0
+	let tLastHafasError = -Infinity
 	const fetchTile = async (tile) => {
 		debugFetch('fetching tile', tile)
 
@@ -120,6 +124,8 @@ const createMonitor = (hafas, bbox, opt) => {
 		} catch (err) {
 			if (err && err.isHafasError) {
 				debugFetch('hafas error', err)
+				totalHafasErrors++
+				tLastHafasError = Date.now()
 				out.emit('hafas-error', err)
 				return;
 			}
@@ -147,8 +153,8 @@ const createMonitor = (hafas, bbox, opt) => {
 	}
 
 	let running = false
-	let fetchTilesTimer = null, tLastFetchTiles = -Infinity
-	let fetchTripsTimer = null, tLastFetchTrips = -Infinity
+	let fetchTilesTimer = null, tLastFetchTiles = Date.now()
+	let fetchTripsTimer = null, tLastFetchTrips = Date.now()
 
 	const fetchAllTiles = async () => {
 		if (!running) return;
