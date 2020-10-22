@@ -63,6 +63,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		const tSinceFetchAllTiles = Date.now() - tLastFetchTiles
 		const tSinceFetchAllTrips = Date.now() - tLastFetchTrips
 		out.emit('stats', {
+			t: Date.now(),
 			...reqCounter.getStats(),
 			running,
 			nrOfTrips: await watchedTrips.count(),
