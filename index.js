@@ -31,9 +31,13 @@ const createMonitor = (hafas, bbox, opt) => {
 	const {
 		fetchTripsInterval,
 		maxTileSize,
+		hafasRadarOpts,
+		hafasTripOpts,
 	} = {
 		fetchTripsInterval: MINUTE,
 		maxTileSize: 5, // km
+		hafasRadarOpts: {},
+		hafasTripOpts: {},
 		...opt,
 	}
 	const fetchTilesInterval = Math.max(
@@ -98,6 +102,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		const movements = await hafas.radar(tile, {
 			results: 1000, duration: 0, frames: 0, polylines: false,
 			// todo: `opt.language`
+			...hafasRadarOpts,
 			...noCache,
 		})
 		onReqTime(Date.now() - t0)
@@ -123,7 +128,11 @@ const createMonitor = (hafas, bbox, opt) => {
 		try {
 			// todo: remove trip if not found
 			trip = await hafas.trip(id, lineName, {
+				stopovers: true,
+				polyline: false,
+				entrances: false,
 				// todo: `opt.language`
+				...hafasTripOpts,
 				...noCache,
 			})
 		} catch (err) {
