@@ -71,6 +71,8 @@ const createMonitor = (hafas, bbox, opt) => {
 			tSinceFetchAllTiles, tSinceFetchAllTrips,
 			totalHafasErrors,
 			tSinceHafasError: Date.now() - tLastHafasError,
+			totalEconnresetErrors,
+			tSinceEconnresetError: Date.now() - tLastEconnresetError,
 		})
 		if (
 			tSinceFetchAllTiles > fetchTilesInterval * 1.5 ||
@@ -87,6 +89,8 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	let totalHafasErrors = 0
 	let tLastHafasError = -Infinity
+	let totalEconnresetErrors = 0
+	let tLastEconnresetError = -Infinity
 	const fetchTile = async (tile) => {
 		debugFetch('fetching tile', tile)
 
@@ -129,6 +133,10 @@ const createMonitor = (hafas, bbox, opt) => {
 				tLastHafasError = Date.now()
 				out.emit('hafas-error', err)
 				return;
+			}
+			if (err && err.code === 'ECONNRESET') {
+				totalEconnresetErrors++
+				tLastEconnresetError = Date.now()
 			}
 			throw err
 		}
