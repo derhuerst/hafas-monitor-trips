@@ -212,6 +212,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		debug('stopping monitor')
 		running = false
 
+		redis.quit()
 		clearTimeout(fetchTilesTimer)
 		fetchTilesTimer = null
 		clearTimeout(fetchTripsTimer)
