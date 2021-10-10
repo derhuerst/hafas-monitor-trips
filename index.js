@@ -6,10 +6,13 @@ const debugFetch = require('debug')('hafas-monitor-trips:fetch')
 const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
 const Redis = require('ioredis')
+const {
+	register: globalMetricsRegistry,
+	Counter, Summary, Gauge,
+} = require('prom-client')
 const computeTiles = require('./lib/compute-tiles')
 const redisOpts = require('./lib/redis-opts')
 const noCache = require('./lib/no-cache')
-const createReqCounter = require('./lib/req-counter')
 const createWatchedTrips = require('./lib/watched-trips')
 const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
 
@@ -23,6 +26,17 @@ intervals to be adhered to. Consider monitoring a smaller bbox or \
 increasing the request throughput.\
 `
 
+const avgReqDuration = async (hafasResponseTime) => {
+	const {name, values} = await hafasResponseTime.get()
+	let sum = 0
+	let count = 0
+	for (const val of values) {
+		if (val.metricName === name + '_sum') sum += val.value
+		else if (val.metricName === name + '_count') count += val.value
+	}
+	return sum / count * 1000
+}
+
 const createMonitor = (hafas, bbox, opt) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
@@ -33,11 +47,13 @@ const createMonitor = (hafas, bbox, opt) => {
 		maxTileSize,
 		hafasRadarOpts,
 		hafasTripOpts,
+		metricsRegistry,
 	} = {
 		fetchTripsInterval: MINUTE,
 		maxTileSize: 5, // km
 		hafasRadarOpts: {},
 		hafasTripOpts: {},
+		metricsRegistry: globalMetricsRegistry,
 		...opt,
 	}
 	const fetchTilesInterval = Math.max(
@@ -51,8 +67,54 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	const out = new EventEmitter()
 
+	// metrics
+	const hafasRequestsTotal = new Counter({
+		name: 'hafas_reqs_total',
+		help: 'nr. of HAFAS requests',
+		registers: [metricsRegistry],
+		labelNames: ['call'],
+	})
+	const hafasErrorsTotal = new Counter({
+		name: 'hafas_errors_total',
+		help: 'nr. of failed HAFAS requests',
+		registers: [metricsRegistry],
+		labelNames: ['call'],
+	})
+	const econnresetErrorsTotal = new Counter({
+		name: 'econnreset_errors_total',
+		help: 'nr. of requests failed with ECONNRESET',
+		registers: [metricsRegistry],
+	})
+	const hafasResponseTime = new Summary({
+		name: 'hafas_response_time_seconds',
+		help: 'HAFAS response time',
+		registers: [metricsRegistry],
+		// todo: use sliding window via maxAgeSeconds & ageBuckets?
+		labelNames: ['call'],
+	})
+	const monitoredTilesTotal = new Gauge({
+		name: 'monitored_tiles_total',
+		help: 'nr. of tiles being monitored',
+		registers: [metricsRegistry],
+	})
+	const monitoredTripsTotal = new Gauge({
+		name: 'monitored_trips_total',
+		help: 'nr. of trips being monitored',
+		registers: [metricsRegistry],
+	})
+	const tilesRefreshesPerSecond = new Gauge({
+		name: 'tiles_refreshes_second',
+		help: 'how often the list of trips is refreshed',
+		registers: [metricsRegistry],
+	})
+	const tripsRefreshesPerSecond = new Gauge({
+		name: 'trips_refreshes_second',
+		help: 'how often all trips are refreshed',
+		registers: [metricsRegistry],
+	})
+
 	const redis = new Redis(redisOpts)
-	const watchedTrips = createWatchedTrips(redis, fetchTilesInterval * 1.5)
+	const watchedTrips = createWatchedTrips(redis, fetchTilesInterval * 1.5, monitoredTripsTotal)
 	const tripSeen = async (id, lineName) => {
 		debugTrips('trip seen', id, lineName)
 		await watchedTrips.put(id, lineName)
@@ -62,16 +124,24 @@ const createMonitor = (hafas, bbox, opt) => {
 		await watchedTrips.del(id)
 	}
 
-	const reqCounter = createReqCounter()
 	const reportStats = throttle(async () => {
 		const tSinceFetchAllTiles = Date.now() - tLastFetchTiles
 		const tSinceFetchAllTrips = Date.now() - tLastFetchTrips
+
+		// todo [breaking]: remove this, report via metricsRegistry
+		let totalReqs = 0
+		for (const _ of (await hafasRequestsTotal.get()).values) totalReqs += _.value
+		let totalHafasErrors = 0
+		for (const _ of (await hafasErrorsTotal.get()).values) totalHafasErrors += _.value
+		let totalEconnresetErrors = 0
+		for (const _ of (await econnresetErrorsTotal.get()).values) totalEconnresetErrors += _.value
 		out.emit('stats', {
 			t: Date.now(),
-			...reqCounter.getStats(),
+			totalReqs,
+			avgReqDuration: await avgReqDuration(hafasResponseTime),
 			running,
-			nrOfTrips: await watchedTrips.count(),
-			nrOfTiles: tiles.length,
+			nrOfTrips: (await monitoredTripsTotal.get()).values[0].value,
+			nrOfTiles: (await monitoredTilesTotal.get()).values[0].value,
 			tSinceFetchAllTiles, tSinceFetchAllTrips,
 			totalHafasErrors,
 			tSinceHafasError: Date.now() - tLastHafasError,
@@ -86,14 +156,14 @@ const createMonitor = (hafas, bbox, opt) => {
 			debug(TOO_MANY_QUEUED_MSG)
 		}
 	}, 1000)
-	const onReqTime = (reqTime) => {
-		reqCounter.onReqTime(reqTime)
+	const onReqTime = (call, reqTime) => {
+		hafasRequestsTotal.inc({call})
+		hafasResponseTime.observe({call}, reqTime / 1000)
+
 		reportStats().catch(err => out.emit('error', err))
 	}
 
-	let totalHafasErrors = 0
 	let tLastHafasError = -Infinity
-	let totalEconnresetErrors = 0
 	let tLastEconnresetError = -Infinity
 	const fetchTile = async (tile) => {
 		debugFetch('fetching tile', tile)
@@ -105,7 +175,7 @@ const createMonitor = (hafas, bbox, opt) => {
 			...hafasRadarOpts,
 			...noCache,
 		})
-		onReqTime(Date.now() - t0)
+		onReqTime('radar', Date.now() - t0)
 
 		for (const m of movements) {
 			const loc = m.location
@@ -138,18 +208,18 @@ const createMonitor = (hafas, bbox, opt) => {
 		} catch (err) {
 			if (err && err.isHafasError) {
 				debugFetch('hafas error', err)
-				totalHafasErrors++
+				hafasErrorsTotal.inc({call: 'trip'})
 				tLastHafasError = Date.now()
 				out.emit('hafas-error', err)
 				return;
 			}
 			if (err && err.code === 'ECONNRESET') {
-				totalEconnresetErrors++
+				econnresetErrorsTotal.inc()
 				tLastEconnresetError = Date.now()
 			}
 			throw err
 		}
-		onReqTime(Date.now() - t0)
+		onReqTime('trip', Date.now() - t0)
 
 		if (trip.stopovers.every(isStopoverObsolete)) {
 			const st = trip.stopovers.map(s => [s.stop.location, s.arrival || s.plannedArrival])

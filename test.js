@@ -2,12 +2,26 @@
 
 const createHafas = require('vbb-hafas')
 const a = require('assert')
+const {Registry} = require('prom-client')
 const createMonitor = require('.')
+
+const METRICS = [
+	'hafas_reqs_total',
+	'hafas_errors_total',
+	'econnreset_errors_total',
+	'hafas_response_time_seconds',
+	'monitored_tiles_total', 'monitored_trips_total',
+	'tiles_refreshes_second', 'trips_refreshes_second',
+]
 
 const bbox = {north: 52.52, west: 13.36, south: 52.5, east: 13.39}
 const hafas = createHafas('hafas-monitor-trips test')
+
+const registry = new Registry()
+
 const monitor = createMonitor(hafas, bbox, {
 	fetchTripsInterval: 4 * 1000,
+	metricsRegistry: registry,
 })
 
 a.strictEqual(monitor.hafas, hafas)
@@ -75,6 +89,11 @@ const onStats = (s) => {
 		a.ok(onStopover.called, 'stopover not emitted')
 		a.ok(onTrip.called, 'trip not emitted')
 		a.ok(onPosition.called, 'position not emitted')
+
+		const metrics = registry.getMetricsAsArray()
+		for (const name of METRICS) {
+			a.ok(metrics.find(m => m.name === name), name + ' metric not defined/exposed')
+		}
 
 		// teardown
 		monitor.removeListener('stopover', onStopover)
