@@ -62,11 +62,6 @@ const createMonitor = (hafas, bbox, opt) => {
 	)
 	debug('fetchTilesInterval', fetchTilesInterval)
 
-	const tiles = computeTiles(bbox, {maxTileSize})
-	debug('tiles', tiles)
-
-	const out = new EventEmitter()
-
 	// metrics
 	const hafasRequestsTotal = new Counter({
 		name: 'hafas_reqs_total',
@@ -112,6 +107,12 @@ const createMonitor = (hafas, bbox, opt) => {
 		help: 'how often all trips are refreshed',
 		registers: [metricsRegistry],
 	})
+
+	const tiles = computeTiles(bbox, {maxTileSize})
+	monitoredTilesTotal.set(tiles.length)
+	debug('tiles', tiles)
+
+	const out = new EventEmitter()
 
 	const redis = new Redis(redisOpts)
 	const watchedTrips = createWatchedTrips(redis, fetchTilesInterval * 1.5, monitoredTripsTotal)
@@ -262,6 +263,7 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	const fetchAllTiles = async () => {
 		if (!running) return;
+		tilesRefreshesPerSecond.set(1000 / (Date.now() - tLastFetchTiles))
 		debug('refreshing all tiles')
 		tLastFetchTiles = Date.now()
 
@@ -280,6 +282,7 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	const fetchAllTrips = async () => {
 		if (!running) return;
+		tripsRefreshesPerSecond.set(1000 / (Date.now() - tLastFetchTrips))
 		debug('refreshing all trips')
 		tLastFetchTrips = Date.now()
 
