@@ -169,12 +169,28 @@ const createMonitor = (hafas, bbox, opt) => {
 		debugFetch('fetching tile', tile)
 
 		const t0 = Date.now()
-		const movements = await hafas.radar(tile, {
-			results: 1000, duration: 0, frames: 0, polylines: false,
-			// todo: `opt.language`
-			...hafasRadarOpts,
-			...noCache,
-		})
+		let movements
+		try {
+			movements = await hafas.radar(tile, {
+				results: 1000, duration: 0, frames: 0, polylines: false,
+				// todo: `opt.language`
+				...hafasRadarOpts,
+				...noCache,
+			})
+		} catch (err) {
+			if (err && err.isHafasError) {
+				debugFetch('hafas error', err)
+				hafasErrorsTotal.inc({call: 'radar'})
+				tLastHafasError = Date.now()
+				out.emit('hafas-error', err)
+				return;
+			}
+			if (err && err.code === 'ECONNRESET') {
+				econnresetErrorsTotal.inc()
+				tLastEconnresetError = Date.now()
+			}
+			throw err
+		}
 		onReqTime('radar', Date.now() - t0)
 
 		for (const m of movements) {
