@@ -1,7 +1,7 @@
 {
 	"name": "hafas-monitor-trips",
 	"description": "Using a HAFAS endpoint, watch all trips in a bounding box.",
-	"version": "4.1.1",
+	"version": "4.2.0",
 	"main": "index.js",
 	"files": [
 		"index.js",
@@ -44,7 +44,7 @@
 	},
 	"scripts": {
 		"lint": "eslint .",
-		"test": "redis-cli flushdb && env DEBUG='hafas-monitor-trips:*' node test.js",
+		"test": "env DEBUG='hafas-monitor-trips:*' node test.js",
 		"redis": "printf 'save\nappendonly no' | redis-server - >/dev/null",
 		"prepublishOnly": "npm run lint && npm test"
 	}
