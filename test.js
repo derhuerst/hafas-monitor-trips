@@ -75,33 +75,21 @@ const onPosition = spy((l, m) => {
 })
 monitor.on('position', onPosition)
 
-let statsEvents = 0
-const onStats = (s) => {
-	a.ok('totalReqs' in s)
-	a.ok('avgReqDuration' in s)
-	a.ok('running' in s)
-	a.ok('nrOfTrips' in s)
-	a.ok('nrOfTiles' in s)
-	a.ok('tSinceFetchAllTiles' in s)
-	a.ok('tSinceFetchAllTrips' in s)
+setTimeout(() => {
+	a.ok(onStopover.called, 'stopover not emitted')
+	a.ok(onTrip.called, 'trip not emitted')
+	a.ok(onPosition.called, 'position not emitted')
 
-	if (++statsEvents >= 10) {
-		a.ok(onStopover.called, 'stopover not emitted')
-		a.ok(onTrip.called, 'trip not emitted')
-		a.ok(onPosition.called, 'position not emitted')
-
-		const metrics = registry.getMetricsAsArray()
-		for (const name of METRICS) {
-			a.ok(metrics.find(m => m.name === name), name + ' metric not defined/exposed')
-		}
-
-		// teardown
-		monitor.removeListener('stopover', onStopover)
-		monitor.removeListener('trip', onTrip)
-		monitor.removeListener('position', onPosition)
-		monitor.removeListener('stats', onStats)
-
-		process.exit()
+	const metrics = registry.getMetricsAsArray()
+	for (const name of METRICS) {
+		a.ok(metrics.find(m => m.name === name), name + ' metric not defined/exposed')
 	}
-}
-monitor.on('stats', onStats)
+
+	// teardown
+	monitor.removeListener('stopover', onStopover)
+	monitor.removeListener('trip', onTrip)
+	monitor.removeListener('position', onPosition)
+
+	console.info('seems to work ✔︎')
+	process.exit()
+}, 11 * 1000)

@@ -26,17 +26,6 @@ intervals to be adhered to. Consider monitoring a smaller bbox or \
 increasing the request throughput.\
 `
 
-const avgReqDuration = async (hafasResponseTime) => {
-	const {name, values} = await hafasResponseTime.get()
-	let sum = 0
-	let count = 0
-	for (const val of values) {
-		if (val.metricName === name + '_sum') sum += val.value
-		else if (val.metricName === name + '_count') count += val.value
-	}
-	return sum / count * 1000
-}
-
 const createMonitor = (hafas, bbox, opt) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
 		throw new Error('Invalid HAFAS client passed.')
@@ -125,30 +114,9 @@ const createMonitor = (hafas, bbox, opt) => {
 		await watchedTrips.del(id)
 	}
 
-	const reportStats = throttle(async () => {
+	const checkQueueLoad = throttle(() => {
 		const tSinceFetchAllTiles = Date.now() - tLastFetchTiles
 		const tSinceFetchAllTrips = Date.now() - tLastFetchTrips
-
-		// todo [breaking]: remove this, report via metricsRegistry
-		let totalReqs = 0
-		for (const _ of (await hafasRequestsTotal.get()).values) totalReqs += _.value
-		let totalHafasErrors = 0
-		for (const _ of (await hafasErrorsTotal.get()).values) totalHafasErrors += _.value
-		let totalEconnresetErrors = 0
-		for (const _ of (await econnresetErrorsTotal.get()).values) totalEconnresetErrors += _.value
-		out.emit('stats', {
-			t: Date.now(),
-			totalReqs,
-			avgReqDuration: await avgReqDuration(hafasResponseTime),
-			running,
-			nrOfTrips: (await monitoredTripsTotal.get()).values[0].value,
-			nrOfTiles: (await monitoredTilesTotal.get()).values[0].value,
-			tSinceFetchAllTiles, tSinceFetchAllTrips,
-			totalHafasErrors,
-			tSinceHafasError: Date.now() - tLastHafasError,
-			totalEconnresetErrors,
-			tSinceEconnresetError: Date.now() - tLastEconnresetError,
-		})
 		if (
 			tSinceFetchAllTiles > fetchTilesInterval * 1.5 ||
 			tSinceFetchAllTrips > fetchTripsInterval * 1.5
@@ -161,11 +129,9 @@ const createMonitor = (hafas, bbox, opt) => {
 		hafasRequestsTotal.inc({call})
 		hafasResponseTime.observe({call}, reqTime / 1000)
 
-		reportStats().catch(err => out.emit('error', err))
+		checkQueueLoad()
 	}
 
-	let tLastHafasError = -Infinity
-	let tLastEconnresetError = -Infinity
 	const fetchTile = async (tile) => {
 		debugFetch('fetching tile', tile)
 
@@ -182,13 +148,11 @@ const createMonitor = (hafas, bbox, opt) => {
 			if (err && err.isHafasError) {
 				debugFetch('hafas error', err)
 				hafasErrorsTotal.inc({call: 'radar'})
-				tLastHafasError = Date.now()
 				out.emit('hafas-error', err)
 				return;
 			}
 			if (err && err.code === 'ECONNRESET') {
 				econnresetErrorsTotal.inc()
-				tLastEconnresetError = Date.now()
 			}
 			throw err
 		}
@@ -224,13 +188,11 @@ const createMonitor = (hafas, bbox, opt) => {
 			if (err && err.isHafasError) {
 				debugFetch('hafas error', err)
 				hafasErrorsTotal.inc({call: 'trip'})
-				tLastHafasError = Date.now()
 				out.emit('hafas-error', err)
 				return;
 			}
 			if (err && err.code === 'ECONNRESET') {
 				econnresetErrorsTotal.inc()
-				tLastEconnresetError = Date.now()
 			}
 			throw err
 		}

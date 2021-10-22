@@ -24,7 +24,6 @@ monitor.once('error', (err) => {
 	process.exit(1)
 })
 monitor.on('hafas-error', console.error)
-monitor.on('stats', console.error)
 
 monitor.on('stopover', (st) => {
 	process.stdout.write(JSON.stringify(st) + '\n')
