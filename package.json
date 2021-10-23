@@ -44,7 +44,7 @@
 	},
 	"scripts": {
 		"lint": "eslint .",
-		"test": "env DEBUG='hafas-monitor-trips:*' node test.js",
+		"test": "env DEBUG='hafas-monitor-trips:*' node test/index.js",
 		"redis": "printf 'save\nappendonly no' | redis-server - >/dev/null",
 		"prepublishOnly": "npm run lint && npm test"
 	}

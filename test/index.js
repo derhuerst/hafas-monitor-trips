@@ -3,7 +3,7 @@
 const createHafas = require('vbb-hafas')
 const a = require('assert')
 const {Registry} = require('prom-client')
-const createMonitor = require('.')
+const createMonitor = require('..')
 
 const METRICS = [
 	'hafas_reqs_total',
