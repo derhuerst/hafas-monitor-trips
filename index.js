@@ -116,9 +116,9 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	const redis = new Redis(redisOpts)
 	const watchedTrips = createWatchedTrips(redis, fetchTilesInterval * 1.5, monitoredTripsTotal)
-	const tripSeen = async (id, lineName) => {
-		debugTrips('trip seen', id, lineName)
-		await watchedTrips.put(id, lineName)
+	const tripSeen = async (trips) => {
+		for (const [id, lineName] of trips) debugTrips('trip seen', id, lineName)
+		await watchedTrips.put(trips)
 	}
 	const tripObsolete = async (id) => {
 		debugTrips('trip obsolete, removing', id)
@@ -201,9 +201,7 @@ const createMonitor = (hafas, bbox, opt) => {
 			out.emit('position', loc, m)
 		}
 
-		await Promise.all(movements.map(async (m) => {
-			await tripSeen(m.tripId, m.line && m.line.name || '')
-		}))
+		await tripSeen(movements.map(m => [m.tripId, m.line && m.line.name || '']))
 	}
 
 	const isStopoverObsolete = createIsStopoverObsolete(bbox)
@@ -254,7 +252,9 @@ const createMonitor = (hafas, bbox, opt) => {
 			}, trip)
 		}
 
-		await tripSeen(trip.id, trip.line && trip.line.name || '')
+		await tripSeen([
+			[trip.id, trip.line && trip.line.name || '']
+		])
 	}
 
 	let running = false
