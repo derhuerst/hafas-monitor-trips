@@ -1,6 +1,10 @@
 'use strict'
 
-const createThrottledHafas = require('vbb-hafas/throttle')
+// const createThrottledHafas = require('vbb-hafas/throttle')
+const {default: PQueue} = require('p-queue')
+const {request} = require('hafas-client/lib/default-profile')
+const createHafas = require('hafas-client')
+const vbbProfile = require('hafas-client/p/vbb')
 const createMonitor = require('.')
 
 const potsdamerPlatz = {
@@ -13,11 +17,18 @@ const bbox = process.env.BBOX
 	? JSON.parse(process.env.BBOX)
 	: potsdamerPlatz
 
+const queue = new PQueue({concurrency: 1})
+const throttledRequest = (...args) => queue.add(() => request(...args))
+
 const userAgent = 'hafas-monitor-trips example'
-const hafas = createThrottledHafas(userAgent, 5, 1000) // 5 req/s
+// const hafas = createThrottledHafas(userAgent, 5, 1000) // 5 req/s
+const hafas = createHafas({
+	...vbbProfile,
+	request: throttledRequest,
+}, userAgent)
 
 const monitor = createMonitor(hafas, bbox, {
-	fetchTripsInterval: 10_000, // 10s
+	fetchTripsInterval: 60_000, // 60s
 })
 monitor.once('error', (err) => {
 	console.error(err)
