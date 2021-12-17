@@ -14,7 +14,12 @@ const mockHafas = {
 	},
 }
 
-const withOp = opName => ({line: {operator: {name: opName}}})
+const withLine = (lineName, opName) => ({
+	line: {
+		name: lineName,
+		operator: {name: opName},
+	},
+})
 
 const lineNameOrFahrtNr0 = '*'
 const opts0 = {}
@@ -40,10 +45,10 @@ a.deepStrictEqual(segments1, [{
 const lineNameOrFahrtNr1a = segments1[0].lineNameOrFahrtNr
 const opts1a = segments1[0].opts
 const trips1a = [
-	withOp('OP 1'),
-	withOp('op2'),
-	withOp('OP 1'),
-	withOp('op_3'),
+	withLine('line A', 'OP 1'),
+	withLine('line B', 'op2'),
+	withLine('line C', 'OP 1'),
+	withLine('line B', 'op_3'),
 ]
 const segments1a2 = tripsListSegmentsFilters(mockHafas, lineNameOrFahrtNr1a, opts1a, trips1a)
 a.deepStrictEqual(segments1a2, [{
@@ -59,6 +64,21 @@ a.deepStrictEqual(segments1a2, [{
 
 const lineNameOrFahrtNr1a2a = segments1a2[0].lineNameOrFahrtNr
 const opts1a2a = segments1a2[0].opts
-a.throws(() => tripsListSegmentsFilters(mockHafas, lineNameOrFahrtNr1a2a, opts1a2a, []))
+const trips1a2a = [
+	withLine('line A', 'OP 1'),
+	withLine('line C', 'OP 1'),
+]
+const segments1a2a3 = tripsListSegmentsFilters(mockHafas, lineNameOrFahrtNr1a2a, opts1a2a, trips1a2a)
+a.deepStrictEqual(segments1a2a3, [{
+	lineNameOrFahrtNr: 'line A',
+	opts: opts1a2a,
+}, {
+	lineNameOrFahrtNr: 'line C',
+	opts: opts1a2a,
+}])
+
+const lineNameOrFahrtNr1a2a3a = segments1a2a3[0].lineNameOrFahrtNr
+const opts1a2a3a = segments1a2a3[0].opts
+a.throws(() => tripsListSegmentsFilters(mockHafas, lineNameOrFahrtNr1a2a3a, opts1a2a3a, []))
 
 console.info('tripsListSegmentsFilters seems to be working ✔︎')
