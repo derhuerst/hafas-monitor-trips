@@ -42,6 +42,7 @@
 	},
 	"devDependencies": {
 		"eslint": "^7.6.0",
+		"hafas-client": "github:derhuerst/hafas-client#c71ee4c9",
 		"vbb-hafas": "^7.0.1"
 	},
 	"scripts": {

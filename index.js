@@ -13,7 +13,7 @@ const {
 const redisOpts = require('./lib/redis-opts')
 const noCache = require('./lib/no-cache')
 const createWatchedTrips = require('./lib/watched-trips')
-const tripsListSegmentsFilters = require('./lib/trips-list-segments-filters')
+// const tripsListSegmentsFilters = require('./lib/trips-list-segments-filters')
 const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
 
 const SECOND = 1000
@@ -128,44 +128,45 @@ const createMonitor = (hafas, bbox, opt) => {
 	}
 
 	const fetchTripsListRecursively = async (lineNameOrFahrtNr = '*', tripsByNameOpts = {}) => {
-		debugFetch('fetching trips list (segment)', lineNameOrFahrtNr, tripsByNameOpts)
+		// debugFetch('fetching trips list (segment)', lineNameOrFahrtNr, tripsByNameOpts)
 
-		const t0 = Date.now()
-		let trips
-		try {
-			trips = await hafas.tripsByName(lineNameOrFahrtNr, tripsByNameOpts)
-		} catch (err) {
-			if (err && err.code === 'NO_MATCH') {
-				trips = []
-			} else {
-				if (err && err.isHafasError) {
-					debugFetch('hafas error', err)
-					hafasErrorsTotal.inc({call: 'radar'})
-					out.emit('hafas-error', err)
-				}
-				if (err && err.code === 'ECONNRESET') {
-					econnresetErrorsTotal.inc()
-				}
-				throw err
-			}
-		}
-		onReqTime('tripsByName', Date.now() - t0)
+		// const t0 = Date.now()
+		// let trips
+		// try {
+		// 	trips = await hafas.tripsByName(lineNameOrFahrtNr, tripsByNameOpts)
+		// 	trips = trips.filter(t => t.id && t.id !== '|') // wtf
+		// } catch (err) {
+		// 	if (err && err.code === 'NO_MATCH') {
+		// 		trips = []
+		// 	} else {
+		// 		if (err && err.isHafasError) {
+		// 			debugFetch('hafas error', err)
+		// 			hafasErrorsTotal.inc({call: 'radar'})
+		// 			out.emit('hafas-error', err)
+		// 		}
+		// 		if (err && err.code === 'ECONNRESET') {
+		// 			econnresetErrorsTotal.inc()
+		// 		}
+		// 		throw err
+		// 	}
+		// }
+		// onReqTime('tripsByName', Date.now() - t0)
 
-		if (trips.length >= TRIPS_BY_NAME_MAX_RESULTS) {
-			debugFetch(`maximum nr. of trips (${trips.length}), segmenting`)
-			const segments = tripsListSegmentsFilters(hafas, lineNameOrFahrtNr, tripsByNameOpts, trips)
+		// await tripSeen(trips.map(t => [t.id, t.line && t.line.name || '']))
 
-			const tripSets = await Promise.all(segments.map(({lineNameOrFahrtNr, opts}) => {
-				return fetchTripsListRecursively(lineNameOrFahrtNr, opts)
-			}))
-			trips = [].concat(...tripSets)
-		} else {
-			debugFetch(`acceptable nr. of trips (${trips.length}), not segmenting`)
-		}
+		// if (trips.length >= TRIPS_BY_NAME_MAX_RESULTS) {
+		// 	debugFetch(`maximum nr. of trips (${trips.length}), segmenting`)
+		// 	const segments = tripsListSegmentsFilters(hafas, lineNameOrFahrtNr, tripsByNameOpts, trips)
 
-		await tripSeen(trips.map(t => [t.id, t.line && t.line.name || '']))
+		// 	const tripSets = await Promise.all(segments.map(({lineNameOrFahrtNr, opts}) => {
+		// 		return fetchTripsListRecursively(lineNameOrFahrtNr, opts)
+		// 	}))
+		// 	trips = [].concat(...tripSets)
+		// } else {
+		// 	debugFetch(`acceptable nr. of trips (${trips.length}), not segmenting`)
+		// }
 
-		return trips
+		// return trips
 	}
 
 	const isStopoverObsolete = createIsStopoverObsolete(bbox)
@@ -258,12 +259,48 @@ const createMonitor = (hafas, bbox, opt) => {
 	let fetchTripsListTimer = null, tLastFetchTripsList = Date.now()
 	let fetchTripsTimer = null, tLastFetchTrips = Date.now()
 
+	let lineNames = null
 	const fetchTripsList = async () => {
 		if (!running) return;
 
 		debug('refreshing the trips list')
 		tLastFetchTripsList = Date.now()
-		let trips = await fetchTripsListRecursively()
+
+		if (!lineNames) {
+			const t0 = Date.now()
+			let pidFilters
+			try {
+				pidFilters = await hafas.pidFiltersAsTree()
+			} catch (err) {
+				if (err && err.isHafasError) {
+					debugFetch('hafas error', err)
+					hafasErrorsTotal.inc({call: 'pidFiltersAsTree'})
+					out.emit('hafas-error', err)
+				}
+				if (err && err.code === 'ECONNRESET') {
+					econnresetErrorsTotal.inc()
+				}
+				throw err
+			}
+
+			lineNames = [] // [[lineName, product], ...]
+			const checkNode = (n) => {
+				if (n.kind === 'line') {
+					lineNames.push([n.name, n.product.product])
+				}
+				if (Array.isArray(n.children)) {
+					for (const c of n.children) checkNode(c)
+				}
+			}
+			checkNode(pidFilters)
+			console.error(...lineNames)
+		}
+
+		// todo:
+		// if we had, for each node in the tree, the nr of trips (either currently
+		// running or during the whole service day), we could walk it and use
+		// fetchTripsListRecursively() for the "highest" node with < TRIPS_BY_NAME_MAX_RESULTS
+		// trips.
 
 		tripsListRefreshesPerSecond.set(1000 / (Date.now() - tLastFetchTripsList))
 		tLastFetchTripsList = Date.now()
