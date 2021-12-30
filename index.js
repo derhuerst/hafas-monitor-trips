@@ -270,17 +270,20 @@ const createMonitor = (hafas, bbox, opt) => {
 		debug('starting monitor')
 		running = true
 
+		// don't log a warning if the monitor was paused
+		tLastFetchTiles = tLastFetchTrips = Date.now()
+
 		fetchAllTiles()
 		.then(fetchAllTrips)
 		.catch(() => {}) // silence rejection
 	}
 
-	const stop = () => {
+	// todo [breaking]: rename to stop()
+	const pause = () => {
 		if (!running) return;
 		debug('stopping monitor')
 		running = false
 
-		redis.quit()
 		clearTimeout(fetchTilesTimer)
 		fetchTilesTimer = null
 		clearTimeout(fetchTripsTimer)
@@ -288,10 +291,17 @@ const createMonitor = (hafas, bbox, opt) => {
 		out.emit('stop')
 	}
 
+	// todo [breaking]: rename to quit()
+	const stop = () => {
+		pause()
+		redis.quit()
+	}
+
 	setImmediate(start)
 
 	out.hafas = hafas
 	out.start = start
+	out.pause = pause
 	out.stop = stop
 	return out
 }
