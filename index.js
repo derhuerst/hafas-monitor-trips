@@ -244,8 +244,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		.catch(err => out.emit('error', err))
 	}
 
-	// todo [breaking]: rename to stop()
-	const pause = () => {
+	const stop = () => {
 		if (!running) return;
 		debug('stopping monitor')
 		running = false
@@ -255,9 +254,8 @@ const createMonitor = (hafas, bbox, opt) => {
 		out.emit('stop')
 	}
 
-	// todo [breaking]: rename to quit()
-	const stop = () => {
-		pause()
+	const quit = () => {
+		stop()
 		redis.quit()
 	}
 
@@ -265,8 +263,8 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	out.hafas = hafas
 	out.start = start
-	out.pause = pause
 	out.stop = stop
+	out.quit = quit
 
 	Object.defineProperty(out, 'bbox', {value: bbox})
 	Object.defineProperty(out, 'metricsRegistry', {value: metricsRegistry})
