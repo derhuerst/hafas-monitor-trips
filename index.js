@@ -78,16 +78,20 @@ const createMonitor = (hafas, bbox, opt) => {
 		help: 'nr. of tiles fetched from HAFAS',
 		registers: [metricsRegistry],
 	})
-	const tilesRefreshesPerSecond = new Gauge({
-		name: 'tiles_refreshes_second',
-		help: 'how often the list of trips is refreshed',
+	const movementsFetchedTotal = new Counter({
+		name: 'movements_fetched_total',
+		help: 'nr. of movements fetched from HAFAS',
 		registers: [metricsRegistry],
 	})
-	const fetchMovementsDuration = new Summary({
-		name: 'fetch_movements_duration_seconds',
-		help: 'time that fetching all movements took',
+	const fetchAllMovementsTotal = new Counter({
+		name: 'fetch_all_movements_total',
+		help: 'how often all movements have been fetched',
 		registers: [metricsRegistry],
-		// todo: use sliding window via maxAgeSeconds & ageBuckets?
+	})
+	const fetchAllMovementsDuration = new Gauge({
+		name: 'fetch_all_movements_duration_seconds',
+		help: 'time that fetching all movements currently takes',
+		registers: [metricsRegistry],
 	})
 
 	const out = new EventEmitter()
@@ -100,6 +104,7 @@ const createMonitor = (hafas, bbox, opt) => {
 	}
 
 	const onMovement = (m) => {
+		movementsFetchedTotal.inc()
 		const loc = m.location
 		out.emit('position', loc, m)
 	}
@@ -209,7 +214,6 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	const fetchAllTiles = async () => {
 		if (!running) return;
-		tilesRefreshesPerSecond.set(1000 / (Date.now() - tLastFetchTiles))
 		debug('refreshing all tiles')
 		tLastFetchTiles = Date.now()
 
@@ -219,7 +223,11 @@ const createMonitor = (hafas, bbox, opt) => {
 			out.emit('error', err)
 		}
 
-		debug('done refreshing tiles')
+		const dur = (Date.now() - tLastFetchTiles) / 1000
+		debug(`done refreshing tiles in ${dur}s`)
+		fetchAllMovementsDuration.set(dur)
+		fetchAllMovementsTotal.inc()
+
 		if (running) {
 			const tNext = Math.max(100, fetchTilesInterval - (Date.now() - tLastFetchTiles))
 			fetchTilesTimer = setTimeout(fetchAllTiles, tNext)

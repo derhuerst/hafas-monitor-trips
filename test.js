@@ -11,7 +11,9 @@ const METRICS = [
 	'hafas_errors_total',
 	'econnreset_errors_total',
 	'hafas_response_time_seconds',
-	'fetch_movements_duration_seconds',
+	'fetch_all_movements_duration_seconds',
+	'movements_fetched_total',
+	'fetch_all_movements_total',
 	'tiles_fetched_total',
 ]
 
