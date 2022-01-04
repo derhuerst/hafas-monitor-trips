@@ -28,7 +28,6 @@
 	"dependencies": {
 		"@turf/destination": "^6.5.0",
 		"@turf/distance": "^6.0.1",
-		"@turf/square-grid": "^6.0.2",
 		"debug": "^4.1.1",
 		"ioredis": "^4.17.3",
 		"live-moving-average": "^1.0.0",

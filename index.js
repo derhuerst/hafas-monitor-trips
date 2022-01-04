@@ -1,5 +1,6 @@
 'use strict'
 
+const {ok} = require('assert')
 const debug = require('debug')('hafas-monitor-trips')
 const debugFetch = require('debug')('hafas-monitor-trips:fetch')
 const {EventEmitter} = require('events')
@@ -8,13 +9,20 @@ const {
 	register: globalMetricsRegistry,
 	Counter, Summary, Gauge,
 } = require('prom-client')
-const computeTiles = require('./lib/compute-tiles')
+const {createHash} = require('crypto')
+const distance = require('@turf/distance').default
 const redisOpts = require('./lib/redis-opts')
+const findMaxRadarResults = require('./lib/find-max-radar-results')
 const noCache = require('./lib/no-cache')
+const pkg = require('./package.json')
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
-const MAX_TILE_SIZE = 5 // in kilometers
+
+const BBOX_EXPECTED_RESULTS_NS = pkg.version.split('.')[0] + ':expected-nr-of-results'
+// We assume that the amount of vehicles varies over the day (and therefore the
+// expected nr. of vehicles within a bbox), but not very quickly.
+const BBOX_EXPECTED_RESULTS_TTL = 3 * 60 * 60 // 3h
 
 const createMonitor = (hafas, bbox, opt) => {
 	if (!hafas) {
@@ -23,15 +31,18 @@ const createMonitor = (hafas, bbox, opt) => {
 	if ('function' !== typeof hafas.radar) {
 		throw new TypeError('hafas.radar must be a function.')
 	}
+	ok(hafas.profile.endpoint, 'hafas.profile.endpoint must not be empty')
+	const endpointHash = createHash('sha256')
+	.update(hafas.profile.endpoint)
+	.digest('base64')
+	.slice(0, 10)
 
 	const {
 		fetchTilesInterval,
-		maxTileSize,
 		hafasRadarOpts,
 		metricsRegistry,
 	} = {
 		fetchTilesInterval: MINUTE,
-		maxTileSize: 5, // km
 		hafasRadarOpts: {},
 		metricsRegistry: globalMetricsRegistry,
 		...opt,
@@ -62,9 +73,9 @@ const createMonitor = (hafas, bbox, opt) => {
 		// todo: use sliding window via maxAgeSeconds & ageBuckets?
 		labelNames: ['call'],
 	})
-	const monitoredTilesTotal = new Gauge({
-		name: 'monitored_tiles_total',
-		help: 'nr. of tiles being monitored',
+	const tilesFetchedTotal = new Counter({
+		name: 'tiles_fetched_total',
+		help: 'nr. of tiles fetched from HAFAS',
 		registers: [metricsRegistry],
 	})
 	const tilesRefreshesPerSecond = new Gauge({
@@ -78,10 +89,6 @@ const createMonitor = (hafas, bbox, opt) => {
 		registers: [metricsRegistry],
 		// todo: use sliding window via maxAgeSeconds & ageBuckets?
 	})
-
-	const tiles = computeTiles(bbox, {maxTileSize})
-	monitoredTilesTotal.set(tiles.length)
-	debug('tiles', tiles)
 
 	const out = new EventEmitter()
 
@@ -117,24 +124,84 @@ const createMonitor = (hafas, bbox, opt) => {
 	.catch(err => handleFetchError('radar', err))
 	.catch(err => out.emit('error', err))
 
-	const fetchTile = async (tile) => {
-		debugFetch('fetching tile', tile)
+	// normalize for better caching
+	const _bbox = {
+		north: Math.round(bbox.north * 10000) / 10000,
+		west: Math.round(bbox.west * 10000) / 10000,
+		south: Math.round(bbox.south * 10000) / 10000,
+		east: Math.round(bbox.east * 10000) / 10000,
+	}
+	const _width = distance(
+		{type: 'Point', coordinates: [bbox.west, bbox.north]},
+		{type: 'Point', coordinates: [bbox.east, bbox.north]},
+	)
+	const _height = distance(
+		{type: 'Point', coordinates: [bbox.west, bbox.north]},
+		{type: 'Point', coordinates: [bbox.west, bbox.south]},
+	)
+	const _splitHorizontally = _width < _height
 
-		const t0 = Date.now()
+	const fetchRecursively = async (bbox = _bbox, splitHorizontally = _splitHorizontally) => {
+		const cacheKey = [
+			BBOX_EXPECTED_RESULTS_NS,
+			endpointHash,
+			bbox.north, bbox.west, bbox.south, bbox.east,
+		].join(':')
+
+		const maxResults = await pMaxRadarResults
+		let nrOfResults = await redis.get(cacheKey)
+		nrOfResults = nrOfResults
+			? parseInt(nrOfResults)
+			: NaN
+
 		let movements
-		try {
-			movements = await hafas.radar(tile, {
-				results: 1000, duration: 0, frames: 0, polylines: false,
-				// todo: `opt.language`
-				...hafasRadarOpts,
-				...noCache,
-			})
-		} catch (err) {
-			handleFetchError('radar', err)
-		}
-		onReqTime('radar', Date.now() - t0)
+		if (nrOfResults >= maxResults) {
+			debugFetch(`expecting too many results because of cached nr. (${nrOfResults})`)
+		} else {
+			// only fetch bbox if we don't expect too many movements
+			debugFetch('fetching bounding box', bbox)
+			const t0 = Date.now()
+			try {
+				movements = await hafas.radar(bbox, {
+					results: 1000, duration: 0, frames: 0, polylines: false,
+					// todo: `opt.language`
+					...hafasRadarOpts,
+					...noCache,
+				})
+			} catch (err) {
+				handleFetchError('radar', err)
+			}
+			onReqTime('radar', Date.now() - t0)
+			tilesFetchedTotal.inc()
 
-		for (const m of movements) onMovement(m)
+			for (const m of movements) onMovement(m)
+
+			nrOfResults = movements.length
+			if (nrOfResults >= maxResults) {
+				debugFetch(`too many results (${movements.length})`)
+				await redis.setex(cacheKey, BBOX_EXPECTED_RESULTS_TTL, movements.length + '')
+			}
+		}
+
+		if (nrOfResults >= maxResults) {
+			// this is accurate enough for our use case
+			let bboxA, bboxB
+			if (splitHorizontally) {
+				const border = Math.round((bbox.east - (bbox.east - bbox.west) / 2) * 10000) / 10000
+				bboxA = {...bbox, east: border}
+				bboxB = {...bbox, west: border}
+			} else {
+				const border = Math.round((bbox.north - (bbox.north - bbox.south) / 2) * 10000) / 10000
+				bboxA = {...bbox, south: border}
+				bboxB = {...bbox, north: border}
+			}
+
+			debugFetch('recursing with split bounding boxes', bboxA, bboxB)
+			await Promise.all([
+				fetchRecursively(bboxA, !splitHorizontally),
+				fetchRecursively(bboxB, !splitHorizontally),
+			])
+		}
 	}
 
 	let running = false
@@ -147,7 +214,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		tLastFetchTiles = Date.now()
 
 		try {
-			await Promise.all(tiles.map(fetchTile))
+			await fetchRecursively()
 		} catch (err) {
 			out.emit('error', err)
 		}
@@ -164,8 +231,9 @@ const createMonitor = (hafas, bbox, opt) => {
 		debug('starting monitor')
 		running = true
 
-		fetchAllTiles()
-		.catch(() => {}) // silence rejection
+		pMaxRadarResults
+		.then(fetchAllTiles)
+		.catch(err => out.emit('error', err))
 	}
 
 	// todo [breaking]: rename to stop()

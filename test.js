@@ -12,7 +12,7 @@ const METRICS = [
 	'econnreset_errors_total',
 	'hafas_response_time_seconds',
 	'fetch_movements_duration_seconds',
-	'monitored_tiles_total',
+	'tiles_fetched_total',
 ]
 
 const bbox = {north: 52.52, west: 13.36, south: 52.5, east: 13.39}
