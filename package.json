@@ -1,10 +1,11 @@
 {
 	"name": "hafas-monitor-trips",
-	"description": "Using a HAFAS endpoint, watch all trips in a bounding box.",
+	"description": "Using a HAFAS endpoint, watch all movements/vehicles in a bounding box, and optionally their trips.",
 	"version": "5.1.0",
 	"main": "index.js",
 	"files": [
 		"index.js",
+		"fetch-trips",
 		"lib",
 		"example.js"
 	],
@@ -25,9 +26,7 @@
 		"node": ">=14"
 	},
 	"dependencies": {
-		"@turf/boolean-within": "^6.0.1",
 		"@turf/distance": "^6.0.1",
-		"@turf/helpers": "^6.1.4",
 		"@turf/square-grid": "^6.0.2",
 		"debug": "^4.1.1",
 		"ioredis": "^4.17.3",

@@ -1,7 +1,6 @@
 'use strict'
 
 const debug = require('debug')('hafas-monitor-trips')
-const debugTrips = require('debug')('hafas-monitor-trips:trips')
 const debugFetch = require('debug')('hafas-monitor-trips:fetch')
 const {EventEmitter} = require('events')
 const Redis = require('ioredis')
@@ -12,37 +11,31 @@ const {
 const computeTiles = require('./lib/compute-tiles')
 const redisOpts = require('./lib/redis-opts')
 const noCache = require('./lib/no-cache')
-const createWatchedTrips = require('./lib/watched-trips')
-const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const MAX_TILE_SIZE = 5 // in kilometers
 
 const createMonitor = (hafas, bbox, opt) => {
-	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
+	if (!hafas) {
 		throw new Error('Invalid HAFAS client passed.')
+	}
+	if ('function' !== typeof hafas.radar) {
+		throw new TypeError('hafas.radar must be a function.')
 	}
 
 	const {
-		fetchTripsInterval,
+		fetchTilesInterval,
 		maxTileSize,
 		hafasRadarOpts,
-		hafasTripOpts,
 		metricsRegistry,
 	} = {
-		fetchTripsInterval: MINUTE,
+		fetchTilesInterval: MINUTE,
 		maxTileSize: 5, // km
 		hafasRadarOpts: {},
-		hafasTripOpts: {},
 		metricsRegistry: globalMetricsRegistry,
 		...opt,
 	}
-	const fetchTilesInterval = Math.max(
-		Math.min(fetchTripsInterval, 3 * MINUTE),
-		30 * SECOND,
-	)
-	debug('fetchTilesInterval', fetchTilesInterval)
 
 	// metrics
 	const hafasRequestsTotal = new Counter({
@@ -74,20 +67,16 @@ const createMonitor = (hafas, bbox, opt) => {
 		help: 'nr. of tiles being monitored',
 		registers: [metricsRegistry],
 	})
-	const monitoredTripsTotal = new Gauge({
-		name: 'monitored_trips_total',
-		help: 'nr. of trips being monitored',
-		registers: [metricsRegistry],
-	})
 	const tilesRefreshesPerSecond = new Gauge({
 		name: 'tiles_refreshes_second',
 		help: 'how often the list of trips is refreshed',
 		registers: [metricsRegistry],
 	})
-	const tripsRefreshesPerSecond = new Gauge({
-		name: 'trips_refreshes_second',
-		help: 'how often all trips are refreshed',
+	const fetchMovementsDuration = new Summary({
+		name: 'fetch_movements_duration_seconds',
+		help: 'time that fetching all movements took',
 		registers: [metricsRegistry],
+		// todo: use sliding window via maxAgeSeconds & ageBuckets?
 	})
 
 	const tiles = computeTiles(bbox, {maxTileSize})
@@ -97,15 +86,6 @@ const createMonitor = (hafas, bbox, opt) => {
 	const out = new EventEmitter()
 
 	const redis = new Redis(redisOpts)
-	const watchedTrips = createWatchedTrips(redis, fetchTilesInterval * 1.5, monitoredTripsTotal)
-	const tripSeen = async (trips) => {
-		for (const [id, lineName] of trips) debugTrips('trip seen', id, lineName)
-		await watchedTrips.put(trips)
-	}
-	const tripObsolete = async (id) => {
-		debugTrips('trip obsolete, removing', id)
-		await watchedTrips.del(id)
-	}
 
 	const onReqTime = (call, reqTime) => {
 		hafasRequestsTotal.inc({call})
@@ -144,64 +124,10 @@ const createMonitor = (hafas, bbox, opt) => {
 
 			out.emit('position', loc, m)
 		}
-
-		await tripSeen(movements.map(m => [m.tripId, m.line && m.line.name || '']))
-	}
-
-	const isStopoverObsolete = createIsStopoverObsolete(bbox)
-	const fetchTrip = async (id, lineName) => {
-		debugFetch('fetching trip', id, lineName)
-
-		const t0 = Date.now()
-		let trip
-		try {
-			// todo: remove trip if not found
-			trip = await hafas.trip(id, lineName, {
-				stopovers: true,
-				polyline: false,
-				entrances: false,
-				// todo: `opt.language`
-				...hafasTripOpts,
-				...noCache,
-			})
-		} catch (err) {
-			if (err && err.isHafasError) {
-				debugFetch('hafas error', err)
-				hafasErrorsTotal.inc({call: 'trip'})
-				out.emit('hafas-error', err)
-				return;
-			}
-			if (err && err.code === 'ECONNRESET') {
-				econnresetErrorsTotal.inc()
-			}
-			throw err
-		}
-		onReqTime('trip', Date.now() - t0)
-
-		if (trip.stopovers.every(isStopoverObsolete)) {
-			const st = trip.stopovers.map(s => [s.stop.location, s.arrival || s.plannedArrival])
-			debugTrips('trip obsolete', id, lineName, st)
-			await tripObsolete(id)
-			return;
-		}
-
-		out.emit('trip', trip)
-		for (const stopover of trip.stopovers) {
-			out.emit('stopover', {
-				tripId: trip.id,
-				line: trip.line,
-				...stopover
-			}, trip)
-		}
-
-		await tripSeen([
-			[trip.id, trip.line && trip.line.name || '']
-		])
 	}
 
 	let running = false
 	let fetchTilesTimer = null, tLastFetchTiles = Date.now()
-	let fetchTripsTimer = null, tLastFetchTrips = Date.now()
 
 	const fetchAllTiles = async () => {
 		if (!running) return;
@@ -222,39 +148,12 @@ const createMonitor = (hafas, bbox, opt) => {
 		}
 	}
 
-	const fetchAllTrips = async () => {
-		if (!running) return;
-		tripsRefreshesPerSecond.set(1000 / (Date.now() - tLastFetchTrips))
-		debug('refreshing all trips')
-		tLastFetchTrips = Date.now()
-
-		try {
-			const jobs = []
-			for await (const [id, lineName] of watchedTrips.entries()) {
-				jobs.push(fetchTrip(id, lineName))
-			}
-			await Promise.all(jobs)
-		} catch (err) {
-			out.emit('error', err)
-		}
-
-		debug('done refreshing trips')
-		if (running) {
-			const tNext = Math.max(100, fetchTripsInterval - (Date.now() - tLastFetchTrips))
-			fetchTripsTimer = setTimeout(fetchAllTrips, tNext)
-		}
-	}
-
 	const start = () => {
 		if (running) return false;
 		debug('starting monitor')
 		running = true
 
-		// don't log a warning if the monitor was paused
-		tLastFetchTiles = tLastFetchTrips = Date.now()
-
 		fetchAllTiles()
-		.then(fetchAllTrips)
 		.catch(() => {}) // silence rejection
 	}
 
@@ -266,8 +165,6 @@ const createMonitor = (hafas, bbox, opt) => {
 
 		clearTimeout(fetchTilesTimer)
 		fetchTilesTimer = null
-		clearTimeout(fetchTripsTimer)
-		fetchTripsTimer = null
 		out.emit('stop')
 	}
 
@@ -283,6 +180,12 @@ const createMonitor = (hafas, bbox, opt) => {
 	out.start = start
 	out.pause = pause
 	out.stop = stop
+
+	Object.defineProperty(out, 'bbox', {value: bbox})
+	Object.defineProperty(out, 'metricsRegistry', {value: metricsRegistry})
+	Object.defineProperty(out, 'handleFetchError', {value: handleFetchError})
+	Object.defineProperty(out, 'onReqTime', {value: onReqTime})
+
 	return out
 }
 

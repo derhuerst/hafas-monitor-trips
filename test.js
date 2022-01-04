@@ -4,14 +4,15 @@ const createHafas = require('vbb-hafas')
 const a = require('assert')
 const {Registry} = require('prom-client')
 const createMonitor = require('.')
+const fetchTrips = require('./fetch-trips')
 
 const METRICS = [
 	'hafas_reqs_total',
 	'hafas_errors_total',
 	'econnreset_errors_total',
 	'hafas_response_time_seconds',
-	'monitored_tiles_total', 'monitored_trips_total',
-	'tiles_refreshes_second', 'trips_refreshes_second',
+	'fetch_movements_duration_seconds',
+	'monitored_tiles_total',
 ]
 
 const bbox = {north: 52.52, west: 13.36, south: 52.5, east: 13.39}
@@ -23,6 +24,7 @@ const monitor = createMonitor(hafas, bbox, {
 	fetchTripsInterval: 4 * 1000,
 	metricsRegistry: registry,
 })
+fetchTrips(monitor)
 
 a.strictEqual(monitor.hafas, hafas)
 

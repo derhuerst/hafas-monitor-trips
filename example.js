@@ -2,6 +2,7 @@
 
 const createThrottledHafas = require('vbb-hafas/throttle')
 const createMonitor = require('.')
+const fetchTrips = require('./fetch-trips')
 
 const potsdamerPlatz = {
 	north: 52.52,
@@ -25,12 +26,11 @@ monitor.once('error', (err) => {
 })
 monitor.on('hafas-error', console.error)
 
-monitor.on('stopover', (st) => {
-	process.stdout.write(JSON.stringify(st) + '\n')
+fetchTrips(monitor)
+
+monitor.on('trip', (trip) => {
+	console.log('trip', trip.id, trip.line.name)
 })
-// monitor.on('trip', (trip) => {
-// 	console.log(trip.stopovers)
-// })
-// monitor.on('position', (loc, movement) => {
-// 	console.log(movement.tripId, movement.line.name, 'pos', loc.latitude, loc.longitude)
-// })
+monitor.on('position', (loc, movement) => {
+	console.log('movement', movement.tripId, movement.line.name, 'pos', loc.latitude, loc.longitude)
+})
