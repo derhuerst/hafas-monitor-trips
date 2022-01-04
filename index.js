@@ -92,6 +92,31 @@ const createMonitor = (hafas, bbox, opt) => {
 		hafasResponseTime.observe({call}, reqTime / 1000)
 	}
 
+	const onMovement = (m) => {
+		const loc = m.location
+		out.emit('position', loc, m)
+	}
+
+	const handleFetchError = (call, err) => {
+		if (err && err.isHafasError) {
+			debugFetch('hafas error', err)
+			hafasErrorsTotal.inc({call})
+			out.emit('hafas-error', err)
+			return;
+		}
+		if (err && err.code === 'ECONNRESET') {
+			econnresetErrorsTotal.inc()
+		}
+		throw err
+	}
+
+	// todo: make it abortable
+	// todo: pass in hafasRadarOpts
+	const pMaxRadarResults = findMaxRadarResults(hafas, bbox, redis, onReqTime, onMovement)
+	pMaxRadarResults
+	.catch(err => handleFetchError('radar', err))
+	.catch(err => out.emit('error', err))
+
 	const fetchTile = async (tile) => {
 		debugFetch('fetching tile', tile)
 
@@ -105,25 +130,11 @@ const createMonitor = (hafas, bbox, opt) => {
 				...noCache,
 			})
 		} catch (err) {
-			if (err && err.isHafasError) {
-				debugFetch('hafas error', err)
-				hafasErrorsTotal.inc({call: 'radar'})
-				out.emit('hafas-error', err)
-				return;
-			}
-			if (err && err.code === 'ECONNRESET') {
-				econnresetErrorsTotal.inc()
-			}
-			throw err
+			handleFetchError('radar', err)
 		}
 		onReqTime('radar', Date.now() - t0)
 
-		for (const m of movements) {
-			const loc = m.location
-			debugFetch(m.tripId, m.line && m.line.name, loc.latitude, loc.longitude)
-
-			out.emit('position', loc, m)
-		}
+		for (const m of movements) onMovement(m)
 	}
 
 	let running = false
