@@ -210,7 +210,7 @@ const createMonitor = (hafas, bbox, opt) => {
 	}
 
 	let running = false
-	let fetchTilesTimer = null, tLastFetchTiles = Date.now()
+	let fetchTilesTimer = null, tLastFetchTiles
 
 	const fetchAllTiles = async () => {
 		if (!running) return;
@@ -229,7 +229,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		fetchAllMovementsTotal.inc()
 
 		if (running) {
-			const tNext = Math.max(100, fetchTilesInterval - (Date.now() - tLastFetchTiles))
+			const tNext = Math.max(100, fetchTilesInterval - dur * 1000)
 			fetchTilesTimer = setTimeout(fetchAllTiles, tNext)
 		}
 	}
