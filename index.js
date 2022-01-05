@@ -3,7 +3,6 @@
 const debug = require('debug')('hafas-monitor-trips')
 const debugTrips = require('debug')('hafas-monitor-trips:trips')
 const debugFetch = require('debug')('hafas-monitor-trips:fetch')
-const throttle = require('lodash.throttle')
 const {EventEmitter} = require('events')
 const Redis = require('ioredis')
 const {
@@ -19,12 +18,6 @@ const createIsStopoverObsolete = require('./lib/is-stopover-obsolete')
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const MAX_TILE_SIZE = 5 // in kilometers
-
-const TOO_MANY_QUEUED_MSG = `\
-There are too many pending requests for the tile/trip fetching \
-intervals to be adhered to. Consider monitoring a smaller bbox or \
-increasing the request throughput.\
-`
 
 const createMonitor = (hafas, bbox, opt) => {
 	if (!hafas || 'function' !== typeof hafas.radar || 'function' !== typeof hafas.trip) {
@@ -114,22 +107,9 @@ const createMonitor = (hafas, bbox, opt) => {
 		await watchedTrips.del(id)
 	}
 
-	const checkQueueLoad = throttle(() => {
-		const tSinceFetchAllTiles = Date.now() - tLastFetchTiles
-		const tSinceFetchAllTrips = Date.now() - tLastFetchTrips
-		if (
-			tSinceFetchAllTiles > fetchTilesInterval * 1.5 ||
-			tSinceFetchAllTrips > fetchTripsInterval * 1.5
-		) {
-			out.emit('too-many-queued')
-			debug(TOO_MANY_QUEUED_MSG)
-		}
-	}, 1000)
 	const onReqTime = (call, reqTime) => {
 		hafasRequestsTotal.inc({call})
 		hafasResponseTime.observe({call}, reqTime / 1000)
-
-		checkQueueLoad()
 	}
 
 	const fetchTile = async (tile) => {
