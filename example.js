@@ -4,6 +4,7 @@ const createThrottledHafas = require('vbb-hafas/throttle')
 const createMonitor = require('.')
 const fetchTrips = require('./fetch-trips')
 const prioBasedTripFetching = require('./fetch-trips/priority-based')
+const timeBasedTripFetching = require('./fetch-trips/time-based')
 
 const potsdamerPlatz = {
 	north: 52.52,
@@ -31,8 +32,13 @@ const prioStrategy = prioBasedTripFetching((movement) => {
 	if (movement.line.product === 'subway') return 0
 	return null
 })
+const timeBasedStrategy = timeBasedTripFetching((movement) => {
+	if (movement.line.product === 'subway') return 1
+	return null
+})
 fetchTrips(monitor, {
-	strategy: prioStrategy,
+	// strategy: prioStrategy,
+	strategy: timeBasedStrategy,
 })
 
 monitor.on('trip', (trip) => {

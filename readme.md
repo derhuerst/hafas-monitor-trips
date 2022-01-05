@@ -99,6 +99,24 @@ const shouldFetchTrip = (movement) => {
 fetchTrips(monitor, priorityBasedStrategy(shouldFetchTrip))
 ```
 
+#### fetching trips with a delay
+
+You can fetch the trips after a certain delay. For example, let's fetch trips after 10s, but only for movements with a delayed next stopover:
+
+```js
+const fetchTrips = require('hafas-monitor-trips/fetch-trips')
+const timeBasedStrategy = require('hafas-monitor-trips/fetch-trips/time-based')
+
+const shouldFetchTrip = (movement) => {
+	const nextStopover = movement.nextStopovers[0]
+	if (nextStopover && nextStopover.arrivalDelay > 0) {
+		return 10 * 1000
+	}
+	return null // don't fetch other movements' trips
+}
+fetchTrips(monitor, timeBasedStrategy(shouldFetchTrip))
+```
+
 ### preventing excessive requests
 
 If you fetch *all* movements' trips, with a bounding larger than a few km², there will be so many HAFAS calls made that you will likely get **rate-limited by the HAFAS endpoint**; The amount depends on the specific endpoint. This is how you can reduce the request rate:
