@@ -31,6 +31,7 @@
 		"debug": "^4.1.1",
 		"ioredis": "^4.17.3",
 		"live-moving-average": "^1.0.0",
+		"p-queue": "^6.6.2",
 		"prom-client": "^14.0.0"
 	},
 	"peerDependencies": {

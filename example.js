@@ -3,6 +3,7 @@
 const createThrottledHafas = require('vbb-hafas/throttle')
 const createMonitor = require('.')
 const fetchTrips = require('./fetch-trips')
+const prioBasedTripFetching = require('./fetch-trips/priority-based')
 
 const potsdamerPlatz = {
 	north: 52.52,
@@ -26,7 +27,13 @@ monitor.once('error', (err) => {
 })
 monitor.on('hafas-error', console.error)
 
-fetchTrips(monitor)
+const prioStrategy = prioBasedTripFetching((movement) => {
+	if (movement.line.product === 'subway') return 0
+	return null
+})
+fetchTrips(monitor, {
+	strategy: prioStrategy,
+})
 
 monitor.on('trip', (trip) => {
 	console.log('trip', trip.id, trip.line.name)

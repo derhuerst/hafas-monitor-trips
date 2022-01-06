@@ -82,6 +82,23 @@ fetchTrips(monitor, rightAwayStrategy(shouldFetchTrip))
 monitor.on('trip', trip => console.log(trip.stopovers))
 ```
 
+#### fetching important trips first
+
+You can control the order in which the trips get fetched. For example, let's fetch the "A" line's trips first, then all other buses' trips:
+
+```js
+const fetchTrips = require('hafas-monitor-trips/fetch-trips')
+const priorityBasedStrategy = require('hafas-monitor-trips/fetch-trips/priority-based')
+
+const shouldFetchTrip = (movement) => {
+	if (movement.line.product === 'bus') {
+		return movement.line.name === 'A' ? 1 : 0
+	}
+	return null // don't fetch other products
+}
+fetchTrips(monitor, priorityBasedStrategy(shouldFetchTrip))
+```
+
 ### preventing excessive requests
 
 If you fetch *all* movements' trips, with a bounding larger than a few km², there will be so many HAFAS calls made that you will likely get **rate-limited by the HAFAS endpoint**; The amount depends on the specific endpoint. This is how you can reduce the request rate:
