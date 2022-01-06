@@ -2,9 +2,15 @@
 
 const {Gauge} = require('prom-client')
 const createPromiseQueue = require('../lib/timed-promise-queue')
+const pkg = require('../package.json')
+
+const REDIS_TRIPS_QUEUE_NS = pkg.version.split('.')[0] + ':trips-timed-q:'
 
 const createTimedTripFetchingStrategy = (shouldFetchTrip) => {
 	const timedTripFetchingStrategy = (monitor) => {
+		const {redis} = monitor
+		if (!redis) throw new Error('missing monitor.redis.')
+
 		// metrics
 		const queueSizeTotal = new Gauge({
 			name: 'fetch_trips_queue_size_total',
@@ -13,9 +19,11 @@ const createTimedTripFetchingStrategy = (shouldFetchTrip) => {
 		})
 		let reportQueueSizeInterval
 
+		const fetchTrip = (tripId) => monitor.fetchTrip(tripId, '?') // todo: fix properly
 		const onError = (err) => monitor.emit('error', err)
-		const queue = createPromiseQueue(monitor.fetchTrip, onError, {
+		const queue = createPromiseQueue(fetchTrip, onError, {
 			// todo: customisable concurrency
+			redis, redisNs: REDIS_TRIPS_QUEUE_NS,
 		})
 		const reportQueueSize = () => {
 			queueSizeTotal.set(queue.size)

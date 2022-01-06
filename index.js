@@ -268,6 +268,7 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	Object.defineProperty(out, 'bbox', {value: bbox})
 	Object.defineProperty(out, 'metricsRegistry', {value: metricsRegistry})
+	Object.defineProperty(out, 'redis', {value: redis})
 	Object.defineProperty(out, 'handleFetchError', {value: handleFetchError})
 	Object.defineProperty(out, 'onReqTime', {value: onReqTime})
 
