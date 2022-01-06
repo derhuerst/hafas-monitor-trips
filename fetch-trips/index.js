@@ -2,8 +2,9 @@
 
 const debug = require('debug')('hafas-monitor-trips:trips')
 const noCache = require('../lib/no-cache')
+const rightAwayStrategy = require('./right-away')
 
-const addTripsFetchingToMonitor = (monitor, opt) => {
+const addTripsFetchingToMonitor = (monitor, opt = {}) => {
 	const {
 		hafas,
 		metricsRegistry,
@@ -24,10 +25,15 @@ const addTripsFetchingToMonitor = (monitor, opt) => {
 	}
 
 	const {
+		strategy,
 		hafasTripOpts,
 	} = {
+		strategy: rightAwayStrategy(() => true),
 		hafasTripOpts: {},
 		...opt,
+	}
+	if ('function' !== typeof strategy) {
+		throw new TypeError('opt.strategy must be a function.')
 	}
 
 	const fetchTrip = async (id, lineName) => {
@@ -62,7 +68,7 @@ const addTripsFetchingToMonitor = (monitor, opt) => {
 	}
 	monitor.fetchTrip = fetchTrip
 
-	// todo: initialise strategy
+	strategy(monitor)
 }
 
 module.exports = addTripsFetchingToMonitor

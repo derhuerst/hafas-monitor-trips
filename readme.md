@@ -61,25 +61,32 @@ If you listen to `position` events, you'll receive all movements (a movement one
 
 You can configure `hafas-monitor-trips` to also fetch a movements trip, including *all* its stopovers. You can configure
 - which movements/vehicles to fetch the trip for (e.g. all, or just buses starting with "1"), as well as
-- when to fetch the trip (by default, right after the movement/vehicle has been fetched).
+- when to fetch the trip (by default, right after the movement/vehicle has been fetched, see below for more details), the *trip fetching strategy*.
 
-```js
-const fetchTrips = require('hafas-monitor-trips/fetch-trips')
-
-fetchTrips(monitor)
-
-monitor.on('trip', trip => console.log(trip.stopovers))
-```
-
-When using `hafas-monitor-trips/fetch-trips`, these additional events will be emitted:
+These additional events will be emitted:
 
 - `trip` – Every trip that has been fetched.
 - `stopover` – Each stopover of every trip that has been fetched.
+
+#### fetching trips right away
+
+For example, we can fetch all buses' trips, right away:
+
+```js
+const fetchTrips = require('hafas-monitor-trips/fetch-trips')
+const rightAwayStrategy = require('hafas-monitor-trips/fetch-trips/right-away')
+
+const shouldFetchTrip = movement => movement.line.product === 'bus'
+fetchTrips(monitor, rightAwayStrategy(shouldFetchTrip))
+
+monitor.on('trip', trip => console.log(trip.stopovers))
+```
 
 ### preventing excessive requests
 
 If you fetch *all* movements' trips, with a bounding larger than a few km², there will be so many HAFAS calls made that you will likely get **rate-limited by the HAFAS endpoint**; The amount depends on the specific endpoint. This is how you can reduce the request rate:
 
+- Use the `shouldFetchTrip(movement)` function to restrict the number of movements/vehicles that you fetch trips of, e.g. to only the line you're interested in, or only buses.
 - Instead of passing a `hafas-client` instance directly into `hafas-monitor-trips`, use [`hafas-client/throttle`](https://github.com/public-transport/hafas-client/blob/5/docs/readme.md#throttling-requests) to prevent bursts of requests. You will have to experiment with the rate until you get a balance, between not sending too many requests, and being able to monitor all relevant trips.
 - Use e.g. [`hafas-client-rpc`](https://github.com/derhuerst/hafas-client-rpc) to run the requests from a pool of worker machines.
 
