@@ -2,13 +2,6 @@
 
 const createRightAwayTripFetchingStrategy = (shouldFetchTrip) => {
 	const rightAwayTripFetchingStrategy = (monitor) => {
-		const {
-			handleFetchError,
-		} = monitor
-		if ('function' !== typeof handleFetchError) {
-			throw new TypeError('monitor.handleFetchError must be a function.')
-		}
-
 		const onError = (err) => monitor.emit('error', err)
 
 		monitor.on('position', (_, movement) => {
@@ -18,7 +11,6 @@ const createRightAwayTripFetchingStrategy = (shouldFetchTrip) => {
 			const lineName = movement.line && movement.line.name || '?'
 
 			monitor.fetchTrip(tripId, lineName)
-			.catch(handleFetchError)
 			.catch(onError)
 		})
 	}

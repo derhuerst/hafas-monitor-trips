@@ -174,7 +174,9 @@ const createMonitor = (hafas, bbox, opt) => {
 					...noCache,
 				})
 			} catch (err) {
+				// emits HAFAS-specific errors, throws all others
 				handleFetchError('radar', err)
+				return; // todo: retry
 			}
 			onReqTime('radar', Date.now() - t0)
 			tilesFetchedTotal.inc()

@@ -52,7 +52,9 @@ const addTripsFetchingToMonitor = (monitor, opt = {}) => {
 				...noCache,
 			})
 		} catch (err) {
+			// emits HAFAS-specific errors, throws all others
 			handleFetchError('trip', err)
+			return; // todo: retry?
 		}
 		onReqTime('trip', Date.now() - t0)
 
