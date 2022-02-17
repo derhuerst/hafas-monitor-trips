@@ -41,10 +41,12 @@ const createMonitor = (hafas, bbox, opt) => {
 		fetchTilesInterval,
 		hafasRadarOpts,
 		metricsRegistry,
+		maxRadarResults: _maxRadarResults,
 	} = {
 		fetchTilesInterval: MINUTE,
 		hafasRadarOpts: {},
 		metricsRegistry: globalMetricsRegistry,
+		maxRadarResults: null,
 		...opt,
 	}
 
@@ -124,7 +126,9 @@ const createMonitor = (hafas, bbox, opt) => {
 
 	// todo: make it abortable
 	// todo: pass in hafasRadarOpts
-	const pMaxRadarResults = findMaxRadarResults(hafas, bbox, redis, onReqTime, onMovement)
+	const pMaxRadarResults = Number.isInteger(_maxRadarResults)
+		? Promise.resolve(_maxRadarResults)
+		: findMaxRadarResults(hafas, bbox, redis, onReqTime, onMovement)
 	pMaxRadarResults
 	.catch(err => handleFetchError('radar', err))
 	.catch(err => out.emit('error', err))

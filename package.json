@@ -1,7 +1,7 @@
 {
 	"name": "hafas-monitor-trips",
 	"description": "Using a HAFAS endpoint, watch all movements/vehicles in a bounding box, and optionally their trips.",
-	"version": "6.0.1",
+	"version": "6.1.0",
 	"main": "index.js",
 	"files": [
 		"index.js",
