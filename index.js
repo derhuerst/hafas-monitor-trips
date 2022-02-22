@@ -50,6 +50,18 @@ const createMonitor = (hafas, bbox, opt) => {
 		...opt,
 	}
 
+	let currentFetchTilesInterval
+	if ('function' === typeof fetchTilesInterval) {
+		currentFetchTilesInterval = fetchTilesInterval
+		if ('number' !== typeof currentFetchTilesInterval()) {
+			throw new TypeError('opt.fetchTilesInterval() must return a number')
+		}
+	} else if ('number' === typeof fetchTilesInterval) {
+		currentFetchTilesInterval = () => fetchTilesInterval
+	} else {
+		throw new TypeError('opt.fetchTilesInterval must be a number of a function')
+	}
+
 	// metrics
 	const hafasRequestsTotal = new Counter({
 		name: 'hafas_reqs_total',
@@ -235,6 +247,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		fetchAllMovementsTotal.inc()
 
 		if (running) {
+			const fetchTilesInterval = currentFetchTilesInterval()
 			const tNext = Math.max(100, fetchTilesInterval - dur * 1000)
 			fetchTilesTimer = setTimeout(fetchAllTiles, tNext)
 		}

@@ -23,7 +23,7 @@ const hafas = createHafas('hafas-monitor-trips test')
 const registry = new Registry()
 
 const monitor = createMonitor(hafas, bbox, {
-	fetchTripsInterval: 4 * 1000,
+	fetchTripsInterval: () => 4 * 1000,
 	metricsRegistry: registry,
 })
 fetchTrips(monitor)
