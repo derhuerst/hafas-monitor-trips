@@ -46,6 +46,7 @@ const monitor = createMonitor(hafas, bbox)
 
 monitor.on('error', err => console.error(err))
 monitor.on('hafas-error', err => console.error(err))
+monitor.on('hafas-client-error', err => console.error(err))
 monitor.on('position', (loc, movement) => console.log(loc, movement))
 ```
 
@@ -53,6 +54,7 @@ You can listen for these events:
 
 - `error` – An error occured, e.g. a network error.
 - `hafas-error` – The HAFAS endpoint rejected a request with an error.
+- `hafas-client-error` – `hafas-client` failed to process the HAFAS response.
 - `position` – The current (estimated) position and full details of a movement/vehicle.
 
 If you listen to `position` events, you'll receive all movements (a movement one of >0 results of a [`radar()` call](https://github.com/public-transport/hafas-client/blob/5/docs/radar.md)) which are within the bounding box right now. Each movement will not have *all* stopovers of its trip though, just the next few; If you want to access all stopovers, you need to fetch the respective trip (see below).

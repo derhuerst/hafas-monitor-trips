@@ -130,6 +130,12 @@ const createMonitor = (hafas, bbox, opt) => {
 			out.emit('hafas-error', err)
 			return;
 		}
+		// todo: this very unprecise, find sth better
+		if (err && err instanceof TypeError) {
+			debugFetch('hafas-client error', err)
+			out.emit('hafas-client-error', err)
+			return;
+		}
 		if (err && err.code === 'ECONNRESET') {
 			econnresetErrorsTotal.inc()
 		}
