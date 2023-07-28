@@ -23,7 +23,7 @@
 	"bugs": "https://github.com/derhuerst/hafas-monitor-trips/issues",
 	"license": "ISC",
 	"engines": {
-		"node": ">=14"
+		"node": ">=20"
 	},
 	"dependencies": {
 		"@turf/destination": "^6.5.0",
