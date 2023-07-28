@@ -1,8 +1,10 @@
-'use strict'
+import createDebug from 'debug'
+import {noCache} from '../lib/no-cache.js'
+import {
+	createRightAwayTripFetchingStrategy as rightAwayStrategy,
+} from './right-away.js'
 
-const debug = require('debug')('hafas-monitor-trips:trips')
-const noCache = require('../lib/no-cache')
-const rightAwayStrategy = require('./right-away')
+const debug = createDebug('hafas-monitor-trips:trips')
 
 const addTripsFetchingToMonitor = (monitor, opt = {}) => {
 	const {
@@ -73,4 +75,6 @@ const addTripsFetchingToMonitor = (monitor, opt = {}) => {
 	strategy(monitor)
 }
 
-module.exports = addTripsFetchingToMonitor
+export {
+	addTripsFetchingToMonitor,
+}

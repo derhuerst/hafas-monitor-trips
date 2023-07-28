@@ -1,20 +1,23 @@
-'use strict'
+import {createRequire} from 'node:module'
+const require = createRequire(import.meta.url)
 
-const {ok} = require('assert')
-const debug = require('debug')('hafas-monitor-trips')
-const debugFetch = require('debug')('hafas-monitor-trips:fetch')
-const {EventEmitter} = require('events')
-const Redis = require('ioredis')
-const {
-	register: globalMetricsRegistry,
+import {ok} from 'node:assert'
+import createDebug from 'debug'
+import {EventEmitter} from 'node:events'
+import Redis from 'ioredis'
+import {
+	register as globalMetricsRegistry,
 	Counter, Summary, Gauge,
-} = require('prom-client')
-const {createHash} = require('crypto')
-const distance = require('@turf/distance').default
-const redisOpts = require('./lib/redis-opts')
-const findMaxRadarResults = require('./lib/find-max-radar-results')
-const noCache = require('./lib/no-cache')
+} from 'prom-client'
+import {createHash} from 'node:crypto'
+import distance from '@turf/distance'
+import {redisOpts} from './lib/redis-opts.js'
+import {findMaxRadarResults} from './lib/find-max-radar-results.js'
+import {noCache} from './lib/no-cache.js'
 const pkg = require('./package.json')
+
+const debug = createDebug('hafas-monitor-trips')
+const debugFetch = createDebug('hafas-monitor-trips:fetch')
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
@@ -301,4 +304,6 @@ const createMonitor = (hafas, bbox, opt) => {
 	return out
 }
 
-module.exports = createMonitor
+export {
+	createMonitor,
+}

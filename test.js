@@ -1,10 +1,10 @@
-'use strict'
-
-const createHafas = require('vbb-hafas')
-const a = require('assert')
-const {Registry} = require('prom-client')
-const createMonitor = require('.')
-const fetchTrips = require('./fetch-trips')
+import createHafas from 'vbb-hafas'
+import * as a from 'node:assert'
+import {Registry} from 'prom-client'
+import {createMonitor} from './index.js'
+import {
+	addTripsFetchingToMonitor as fetchTrips,
+} from './fetch-trips/index.js'
 
 const METRICS = [
 	'hafas_reqs_total',

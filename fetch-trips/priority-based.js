@@ -1,8 +1,9 @@
-'use strict'
+import {createRequire} from 'node:module'
+const require = createRequire(import.meta.url)
 
-const {Gauge} = require('prom-client')
-const PromiseQueue = require('p-queue').default
-const redisReadRange = require('../lib/redis-read-range')
+import {Gauge} from 'prom-client'
+import PromiseQueue from 'p-queue'
+import {redisReadRange} from '../lib/redis-read-range.js'
 const pkg = require('../package.json')
 
 const REDIS_TRIPS_QUEUE_NS = pkg.version.split('.')[0] + ':trips-prioritised-q:'
@@ -89,4 +90,6 @@ const createPriorityBasedTripFetchingStrategy = (shouldFetchTrip, opt = {}) => {
 	return priorityBasedTripFetchingStrategy
 }
 
-module.exports = createPriorityBasedTripFetchingStrategy
+export {
+	createPriorityBasedTripFetchingStrategy,
+}

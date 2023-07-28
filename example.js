@@ -1,11 +1,16 @@
-'use strict'
 /* eslint-disable no-unused-vars */
 
-const createThrottledHafas = require('vbb-hafas/throttle')
-const createMonitor = require('.')
-const fetchTrips = require('./fetch-trips')
-const prioBasedTripFetching = require('./fetch-trips/priority-based')
-const timeBasedTripFetching = require('./fetch-trips/time-based')
+import createThrottledHafas from 'vbb-hafas/throttle.js'
+import {createMonitor} from './index.js'
+import {
+	addTripsFetchingToMonitor as fetchTrips,
+} from './fetch-trips/index.js'
+import {
+	createPriorityBasedTripFetchingStrategy as prioBasedTripFetching,
+} from './fetch-trips/priority-based.js'
+import {
+	createTimeBasedTripFetchingStrategy as timeBasedTripFetching,
+} from './fetch-trips/time-based.js'
 
 const potsdamerPlatz = {
 	north: 52.52,

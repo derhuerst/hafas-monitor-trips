@@ -31,8 +31,8 @@ In the following example, we'll keep things simple:
 *Note:* `hafas-monitor-trips` only works with [`hafas-client@5`](https://github.com/public-transport/hafas-client/tree/5)-compatible API clients.
 
 ```js
-const createHafas = require('vbb-hafas')
-const createMonitor = require('hafas-monitor-trips')
+import createHafas from 'vbb-hafas'
+import {createMonitor} from 'hafas-monitor-trips'
 
 const bbox = { // Potsdamer Platz in Berlin
 	north: 52.52,
@@ -75,8 +75,12 @@ These additional events will be emitted:
 For example, we can fetch all buses' trips, right away:
 
 ```js
-const fetchTrips = require('hafas-monitor-trips/fetch-trips')
-const rightAwayStrategy = require('hafas-monitor-trips/fetch-trips/right-away')
+import {
+	addTripsFetchingToMonitor as fetchTrips,
+} from 'hafas-monitor-trips/fetch-trips/index.js'
+import {
+	createRightAwayTripFetchingStrategy as rightAwayStrategy,
+} from 'hafas-monitor-trips/fetch-trips/right-away.js'
 
 const shouldFetchTrip = movement => movement.line.product === 'bus'
 fetchTrips(monitor, rightAwayStrategy(shouldFetchTrip))
@@ -89,8 +93,12 @@ monitor.on('trip', trip => console.log(trip.stopovers))
 You can control the order in which the trips get fetched. For example, let's fetch the "A" line's trips first, then all other buses' trips:
 
 ```js
-const fetchTrips = require('hafas-monitor-trips/fetch-trips')
-const priorityBasedStrategy = require('hafas-monitor-trips/fetch-trips/priority-based')
+import {
+	addTripsFetchingToMonitor as fetchTrips,
+} from 'hafas-monitor-trips/fetch-trips/index.js'
+import {
+	createPriorityBasedTripFetchingStrategy as priorityBasedStrategy,
+} from 'hafas-monitor-trips/fetch-trips/priority-based.js'
 
 const shouldFetchTrip = (movement) => {
 	if (movement.line.product === 'bus') {
@@ -106,8 +114,12 @@ fetchTrips(monitor, priorityBasedStrategy(shouldFetchTrip))
 You can fetch the trips after a certain delay. For example, let's fetch trips after 10s, but only for movements with a delayed next stopover:
 
 ```js
-const fetchTrips = require('hafas-monitor-trips/fetch-trips')
-const timeBasedStrategy = require('hafas-monitor-trips/fetch-trips/time-based')
+import {
+	addTripsFetchingToMonitor as fetchTrips,
+} from 'hafas-monitor-trips/fetch-trips/index.js'
+import {
+	createTimeBasedTripFetchingStrategy as timeBasedStrategy,
+} from 'hafas-monitor-trips/fetch-trips/time-based.js'
 
 const shouldFetchTrip = (movement) => {
 	const nextStopover = movement.nextStopovers[0]

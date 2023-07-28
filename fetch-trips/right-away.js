@@ -1,5 +1,3 @@
-'use strict'
-
 const createRightAwayTripFetchingStrategy = (shouldFetchTrip) => {
 	const rightAwayTripFetchingStrategy = (monitor) => {
 		const onError = (err) => monitor.emit('error', err)
@@ -17,4 +15,6 @@ const createRightAwayTripFetchingStrategy = (shouldFetchTrip) => {
 	return rightAwayTripFetchingStrategy
 }
 
-module.exports = createRightAwayTripFetchingStrategy
+export {
+	createRightAwayTripFetchingStrategy,
+}

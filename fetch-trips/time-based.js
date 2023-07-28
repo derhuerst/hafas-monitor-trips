@@ -1,7 +1,10 @@
-'use strict'
+import {createRequire} from 'node:module'
+const require = createRequire(import.meta.url)
 
-const {Gauge} = require('prom-client')
-const createPromiseQueue = require('../lib/timed-promise-queue')
+import {Gauge} from 'prom-client'
+import {
+	createTimedPromiseQueue as createPromiseQueue,
+} from '../lib/timed-promise-queue.js'
 const pkg = require('../package.json')
 
 const REDIS_TRIPS_QUEUE_NS = pkg.version.split('.')[0] + ':trips-timed-q:'
@@ -55,4 +58,6 @@ const createTimedTripFetchingStrategy = (shouldFetchTrip) => {
 	return timedTripFetchingStrategy
 }
 
-module.exports = createTimedTripFetchingStrategy
+export {
+	createTimedTripFetchingStrategy as createTimeBasedTripFetchingStrategy,
+}
