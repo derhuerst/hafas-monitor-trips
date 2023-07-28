@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
 
-import createThrottledHafas from 'vbb-hafas/throttle.js'
+import {
+	createThrottledClient as createThrottledHafas,
+} from 'vbb-hafas/throttle.js'
 import {createMonitor} from './index.js'
 import {
 	addTripsFetchingToMonitor as fetchTrips,

@@ -45,7 +45,7 @@ const addTripsFetchingToMonitor = (monitor, opt = {}) => {
 		let trip
 		try {
 			// todo: remove trip if not found
-			trip = await hafas.trip(id, lineName, {
+			const res = await hafas.trip(id, lineName, {
 				stopovers: true,
 				polyline: false,
 				entrances: false,
@@ -53,6 +53,7 @@ const addTripsFetchingToMonitor = (monitor, opt = {}) => {
 				...hafasTripOpts,
 				...noCache,
 			})
+			trip = res.trip
 		} catch (err) {
 			// emits HAFAS-specific errors, throws all others
 			handleFetchError('trip', err)

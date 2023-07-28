@@ -1,6 +1,6 @@
 # hafas-monitor-trips
 
-**Using a HAFAS endpoint, watch all [movements/vehicles](https://github.com/public-transport/hafas-client/blob/5/docs/radar.md) in a bounding box**, and optionally their [trips](https://github.com/public-transport/hafas-client/blob/5/docs/trip.md).
+**Using a HAFAS endpoint, watch all [movements/vehicles](https://github.com/public-transport/hafas-client/blob/6/docs/radar.md) in a bounding box**, and optionally their [trips](https://github.com/public-transport/hafas-client/blob/6/docs/trip.md).
 
 [![npm version](https://img.shields.io/npm/v/hafas-monitor-trips.svg)](https://www.npmjs.com/package/hafas-monitor-trips)
 [![build status](https://api.travis-ci.org/derhuerst/hafas-monitor-trips.svg?branch=master)](https://travis-ci.org/derhuerst/hafas-monitor-trips)
@@ -28,10 +28,10 @@ In the following example, we'll keep things simple:
 - We monitor a small bounding box in the center of Berlin.
 - We `console.log` all `positions`s (of all movements/vehicles being monitored).
 
-*Note:* `hafas-monitor-trips` only works with [`hafas-client@5`](https://github.com/public-transport/hafas-client/tree/5)-compatible API clients.
+*Note:* `hafas-monitor-trips` only works with [`hafas-client@6`](https://github.com/public-transport/hafas-client/tree/6)-compatible API clients.
 
 ```js
-import createHafas from 'vbb-hafas'
+import {createVbbHafas as createHafas} from 'vbb-hafas'
 import {createMonitor} from 'hafas-monitor-trips'
 
 const bbox = { // Potsdamer Platz in Berlin
@@ -57,7 +57,7 @@ You can listen for these events:
 - `hafas-client-error` – `hafas-client` failed to process the HAFAS response.
 - `position` – The current (estimated) position and full details of a movement/vehicle.
 
-If you listen to `position` events, you'll receive all movements (a movement one of >0 results of a [`radar()` call](https://github.com/public-transport/hafas-client/blob/5/docs/radar.md)) which are within the bounding box right now. Each movement will not have *all* stopovers of its trip though, just the next few; If you want to access all stopovers, you need to fetch the respective trip (see below).
+If you listen to `position` events, you'll receive all movements (a movement one of >0 results of a [`radar()` call](https://github.com/public-transport/hafas-client/blob/6/docs/radar.md)) which are within the bounding box right now. Each movement will not have *all* stopovers of its trip though, just the next few; If you want to access all stopovers, you need to fetch the respective trip (see below).
 
 ### fetching trips
 
@@ -136,7 +136,7 @@ fetchTrips(monitor, timeBasedStrategy(shouldFetchTrip))
 If you fetch *all* movements' trips, with a bounding larger than a few km², there will be so many HAFAS calls made that you will likely get **rate-limited by the HAFAS endpoint**; The amount depends on the specific endpoint. This is how you can reduce the request rate:
 
 - Use the `shouldFetchTrip(movement)` function to restrict the number of movements/vehicles that you fetch trips of, e.g. to only the line you're interested in, or only buses.
-- Instead of passing a `hafas-client` instance directly into `hafas-monitor-trips`, use [`hafas-client/throttle`](https://github.com/public-transport/hafas-client/blob/5/docs/readme.md#throttling-requests) to prevent bursts of requests. You will have to experiment with the rate until you get a balance, between not sending too many requests, and being able to monitor all relevant trips.
+- Instead of passing a `hafas-client` instance directly into `hafas-monitor-trips`, use [`hafas-client/throttle`](https://github.com/public-transport/hafas-client/blob/6/docs/readme.md#throttling-requests) to prevent bursts of requests. You will have to experiment with the rate until you get a balance, between not sending too many requests, and being able to monitor all relevant trips.
 - Use e.g. [`hafas-client-rpc`](https://github.com/derhuerst/hafas-client-rpc) to run the requests from a pool of worker machines.
 
 

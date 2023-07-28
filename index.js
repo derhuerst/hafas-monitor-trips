@@ -192,12 +192,13 @@ const createMonitor = (hafas, bbox, opt) => {
 			debugFetch('fetching bounding box', bbox)
 			const t0 = Date.now()
 			try {
-				movements = await hafas.radar(bbox, {
+				const res = await hafas.radar(bbox, {
 					results: 1000, duration: 0, frames: 0, polylines: false,
 					// todo: `opt.language`
 					...hafasRadarOpts,
 					...noCache,
 				})
+				movements = res.movements
 			} catch (err) {
 				// emits HAFAS-specific errors, throws all others
 				handleFetchError('radar', err)

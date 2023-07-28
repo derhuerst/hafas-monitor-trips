@@ -1,4 +1,4 @@
-import createHafas from 'vbb-hafas'
+import {createVbbHafas as createHafas} from 'vbb-hafas'
 import * as a from 'node:assert'
 import {Registry} from 'prom-client'
 import {createMonitor} from './index.js'
