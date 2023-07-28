@@ -19,6 +19,7 @@ const createTimedTripFetchingStrategy = (shouldFetchTrip) => {
 		})
 		let reportQueueSizeInterval
 
+		// todo: allow passing a payload into `queue`
 		const fetchTrip = (tripId) => monitor.fetchTrip(tripId, '?') // todo: fix properly
 		const onError = (err) => monitor.emit('error', err)
 		const queue = createPromiseQueue(fetchTrip, onError, {

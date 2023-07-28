@@ -1,4 +1,5 @@
 'use strict'
+/* eslint-disable no-unused-vars */
 
 const createThrottledHafas = require('vbb-hafas/throttle')
 const createMonitor = require('.')

@@ -284,6 +284,7 @@ const createMonitor = (hafas, bbox, opt) => {
 		redis.quit()
 	}
 
+	// todo: optionally, don't do this right away but in `Date.now() % interval` ms?
 	setImmediate(start)
 
 	out.hafas = hafas
