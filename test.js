@@ -1,10 +1,35 @@
 import {createVbbHafas as createHafas} from 'vbb-hafas'
 import * as a from 'node:assert'
 import {Registry} from 'prom-client'
+import {expandingBoundingBoxes} from './lib/find-max-radar-results.js'
 import {createMonitor} from './index.js'
 import {
 	addTripsFetchingToMonitor as fetchTrips,
 } from './fetch-trips/index.js'
+
+a.deepStrictEqual(
+	Array.from(expandingBoundingBoxes({
+		north: 54.52,
+		west: 6.54,
+		south: 51.29,
+		east: 6.65,
+	}))
+	.map(({north, west, south, east}, i) => [north, west, south, east]),
+	[
+		[53.0665,6.5895,52.7435,6.6005],
+		[53.1473,6.5868,52.6628,6.6032],
+		[53.2684,6.5826,52.5416,6.6074],
+		[53.4501,6.5764,52.3599,6.6136],
+		[53.7226,6.5672,52.0874,6.6228],
+		[54.1314,6.5532,51.6786,6.6368],
+		[54.7446,6.5324,51.0654,6.6576],
+		[55.6644,6.501, 50.1456,6.689 ],
+		[57.0441,6.454, 48.7659,6.736 ],
+		[59.1136,6.3836,46.6964,6.8064],
+		[62.2179,6.2778,43.5921,6.9122],
+		[66.8744,6.1193,38.9356,7.0707],
+	],
+)
 
 const METRICS = [
 	'hafas_reqs_total',
